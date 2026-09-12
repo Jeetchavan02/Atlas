@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Heart, Droplet, Moon, Footprints, Flame, Wifi } from "lucide-react";
+import { Activity, Heart, Droplet, Moon, Footprints, Flame, Wifi, Database, Scale } from "lucide-react";
 import { PageHeader } from "@/components/atlas-shell";
 import { ZeppSyncBadge } from "@/components/ZeppSyncBadge";
+import { SectionLabel } from "@/components/atlas/index";
 import { useHealthSync } from "@/hooks/useHealthSync";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -20,14 +18,9 @@ import {
 export const Route = createFileRoute("/health")({
   head: () => ({
     meta: [
-      { title: "Health — Atlas" },
-      {
-        name: "description",
-        content:
-          "Atlas Health: sleep, heart rate, recovery, nutrition — your biology, beautifully tracked.",
-      },
-      { property: "og:title", content: "Health — Atlas" },
-      { property: "og:description", content: "Your biology, beautifully tracked." },
+      { title: "Health — Atlas OS" },
+      { name: "description", content: "Atlas Health: your biology, clearly interpreted." },
+      { property: "og:title", content: "Health — Atlas OS" },
     ],
   }),
   component: HealthPage,
@@ -42,57 +35,57 @@ function formatTime(lastSync: Date | null): string {
   return `${Math.floor(min / 60)}h ago`;
 }
 
+const tooltipStyle = {
+  background: "oklch(0.16 0.025 270 / 0.96)",
+  border: "1px solid oklch(1 0 0 / 0.08)",
+  borderRadius: 8,
+  color: "white",
+  fontSize: 11,
+};
+
 function HealthPage() {
   const { metric, weightTrend, isLive, isLoading, lastSyncedAt } = useHealthSync();
 
-  const rhr = metric?.restingHeartRate || 0;
-  const steps = metric?.steps || 0;
-  const calories = metric?.caloriesBurned || 0;
-  const water = metric?.waterLiters || 0;
-  const sleepHours = metric?.sleepHours || 0;
-  const sleepScore = metric?.sleepScore || 0;
-  const macros = metric?.macros || [];
-  const macroPie = metric?.macrosPie || [];
-  const hrData = metric?.heartRate || [];
-  const totalCalories = metric?.totalCalories || 0;
+  const rhr        = metric?.restingHeartRate ?? null;
+  const steps      = metric?.steps ?? null;
+  const calories   = metric?.caloriesBurned ?? null;
+  const water      = metric?.waterLiters ?? null;
+  const sleepHours = metric?.sleepHours ?? null;
+  const sleepScore = metric?.sleepScore ?? null;
+  const macros     = metric?.macros ?? [];
+  const hrData     = metric?.heartRate ?? [];
+  const totalCalories = metric?.totalCalories ?? null;
 
-  // Fallback spark data when no HR readings yet
-  const hrDisplay =
-    hrData.length > 0
-      ? hrData
-      : Array.from({ length: 48 }, (_, i) => ({
-          t: i,
-          bpm: 60 + Math.round(Math.sin(i / 4) * 8 + (i > 30 ? 20 : 0)),
-        }));
+  const hasData = rhr !== null || steps !== null || sleepScore !== null;
 
-  const weightDisplay =
-    weightTrend.length > 0
-      ? weightTrend
-      : Array.from({ length: 30 }, (_, i) => ({
-          d: i + 1,
-          w: 78 - i * 0.04 + Math.sin(i / 4) * 0.3,
-        }));
-
-  const hrMin = hrDisplay.length > 0 ? Math.min(...hrDisplay.map((r) => r.bpm)) : 48;
-  const hrMax = hrDisplay.length > 0 ? Math.max(...hrDisplay.map((r) => r.bpm)) : 168;
+  const hrMin = hrData.length > 0 ? Math.min(...hrData.map((r) => r.bpm)) : null;
+  const hrMax = hrData.length > 0 ? Math.max(...hrData.map((r) => r.bpm)) : null;
   const hrAvg =
-    hrDisplay.length > 0
-      ? Math.round(hrDisplay.reduce((s, r) => s + r.bpm, 0) / hrDisplay.length)
-      : 64;
+    hrData.length > 0
+      ? Math.round(hrData.reduce((s, r) => s + r.bpm, 0) / hrData.length)
+      : null;
+
+  const recoveryInterpretation =
+    sleepScore === null ? null :
+    sleepScore > 85 ? "Optimal" :
+    sleepScore > 70 ? "Good" :
+    sleepScore > 55 ? "Below baseline" :
+    sleepScore > 0  ? "Poor — rest recommended" :
+    null;
 
   return (
     <>
       <PageHeader
-        eyebrow={`Health score · ${sleepScore || 76}`}
-        title="Health"
+        eyebrow="Health"
+        title="Body status."
         subtitle="The body is the operating system underneath everything else."
         right={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {isLive && (
-              <div className="glass-pill flex items-center gap-2 px-3 py-1.5 text-xs">
+              <div className="glass-pill flex items-center gap-2 px-2.5 py-1.5 text-[11px]">
                 <Wifi className="h-3 w-3 text-mint" />
                 <span className="text-mint">Live</span>
-                <span className="text-white/40">· {formatTime(lastSyncedAt)}</span>
+                <span className="text-white/35">· {formatTime(lastSyncedAt)}</span>
               </div>
             )}
             <ZeppSyncBadge compact />
@@ -100,259 +93,212 @@ function HealthPage() {
         }
       />
 
-      <div className="grid grid-cols-12 gap-5">
-        {/* Stat cards */}
-        {[
-          {
-            label: "Resting HR",
-            value: rhr > 0 ? `${rhr}` : isLoading ? "—" : "52",
-            unit: "bpm",
-            icon: Heart,
-            color: "iris",
-          },
-          {
-            label: "Steps",
-            value: steps > 0 ? steps.toLocaleString() : isLoading ? "—" : "0",
-            unit: "today",
-            icon: Footprints,
-            color: "mint",
-          },
-          {
-            label: "Calories",
-            value: calories > 0 ? calories.toLocaleString() : isLoading ? "—" : "0",
-            unit: "burned",
-            icon: Flame,
-            color: "amber-glow",
-          },
-          {
-            label: "Water",
-            value: water > 0 ? `${water.toFixed(1)}L` : isLoading ? "—" : "0L",
-            unit: "of 3L",
-            icon: Droplet,
-            color: "cyan-glow",
-          },
-        ].map((s) => (
+      {!hasData && !isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08]">
+            <Activity className="h-6 w-6 text-white/30" />
+          </div>
+          <h2 className="text-[15px] font-medium text-white/80">No health data available.</h2>
+          <p className="mt-2 max-w-sm text-[12.5px] text-white/40">
+            Connect a supported device or sync a service to begin building your biological baseline.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-12 gap-5">
+          {/* ── RECOVERY SUMMARY (top priority) ─────────────────── */}
           <section
-            key={s.label}
-            className="glass-card col-span-6 flex items-center gap-4 p-5 md:col-span-3"
+            className="glass-card col-span-12 p-6 lg:col-span-4"
+            style={
+              sleepScore !== null && sleepScore < 70
+                ? { borderColor: "oklch(0.82 0.16 75 / 0.15)" }
+                : {}
+            }
           >
-            <div
-              className={`flex h-11 w-11 items-center justify-center rounded-xl bg-${s.color}/15 text-${s.color} ring-1 ring-${s.color}/30`}
-            >
-              <s.icon className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-                {s.label}
-              </div>
-              <div className="font-display text-2xl text-white">{s.value}</div>
-              <div className="text-[11px] text-white/50">{s.unit}</div>
-            </div>
-          </section>
-        ))}
-
-        {/* Heart rate chart */}
-        <section className="glass-card col-span-12 p-7 lg:col-span-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Heart rate</h2>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-white/50">
-                {hrData.length > 0 ? `${hrData.length} readings · live` : "Last 24 hours · demo"}
-              </p>
-            </div>
-            <div className="flex gap-2 text-xs">
-              <span className="glass-pill px-3 py-1 text-iris">Min {hrMin}</span>
-              <span className="glass-pill px-3 py-1 text-amber-glow">Max {hrMax}</span>
-              <span className="glass-pill px-3 py-1 text-mint">Avg {hrAvg}</span>
-            </div>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hrDisplay}>
-                <XAxis dataKey="t" hide />
-                <YAxis hide domain={[40, 180]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "oklch(0.18 0.03 270 / 0.9)",
-                    border: "1px solid oklch(1 0 0 / 0.1)",
-                    borderRadius: 12,
-                    color: "white",
-                    fontSize: 12,
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="bpm"
-                  stroke="oklch(0.7 0.2 290)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* Macros pie */}
-        <section className="glass-card col-span-12 p-7 lg:col-span-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-medium text-white">Macros today</h2>
-            <Activity className="h-4 w-4 text-mint" />
-          </div>
-          <div className="relative mt-2 h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={
-                    macroPie.length > 0
-                      ? macroPie
-                      : [
-                          { name: "Protein", value: 138, fill: "oklch(0.7 0.2 290)" },
-                          { name: "Carbs", value: 210, fill: "oklch(0.82 0.15 200)" },
-                          { name: "Fat", value: 62, fill: "oklch(0.82 0.16 75)" },
-                        ]
-                  }
-                  dataKey="value"
-                  innerRadius={48}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  strokeWidth={0}
-                >
-                  {(macroPie.length > 0 ? macroPie : []).map((s, i) => (
-                    <Cell key={i} fill={s.fill} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <div className="font-display text-2xl text-white">
-                {totalCalories > 0 ? totalCalories.toLocaleString() : "—"}
-              </div>
-              <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-                kcal
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 space-y-2">
-            {(macros.length > 0
-              ? macros
-              : [
-                  { name: "Protein", value: 138, target: 180, fill: "oklch(0.7 0.2 290)" },
-                  { name: "Carbs", value: 210, target: 280, fill: "oklch(0.82 0.15 200)" },
-                  { name: "Fat", value: 62, target: 80, fill: "oklch(0.82 0.16 75)" },
-                ]
-            ).map((m) => (
-              <div key={m.name}>
-                <div className="flex justify-between text-xs text-white">
-                  <span>{m.name}</span>
-                  <span className="font-mono text-white/60">
-                    {m.value}/{m.target}g
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/5">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${Math.min(100, (m.value / m.target) * 100)}%`,
-                      background: m.fill,
-                      boxShadow: `0 0 12px ${m.fill}`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Weight trend */}
-        <section className="glass-card col-span-12 p-7 lg:col-span-8">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Weight trend</h2>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-white/50">
-                {weightTrend.length > 0
-                  ? `${weightTrend.length} data points · 90 days`
-                  : "30 days · demo"}
-              </p>
-            </div>
-          </div>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weightDisplay}>
-                <defs>
-                  <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.78 0.16 165)" stopOpacity={0.6} />
-                    <stop offset="100%" stopColor="oklch(0.78 0.16 165)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="d" hide />
-                <YAxis hide domain={["dataMin - 0.5", "dataMax + 0.5"]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "oklch(0.18 0.03 270 / 0.9)",
-                    border: "1px solid oklch(1 0 0 / 0.1)",
-                    borderRadius: 12,
-                    color: "white",
-                    fontSize: 12,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="w"
-                  stroke="oklch(0.78 0.16 165)"
-                  strokeWidth={2}
-                  fill="url(#wg)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* Sleep + Zepp panel */}
-        <section className="col-span-12 space-y-5 lg:col-span-4">
-          <div className="glass-card p-7">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-medium text-white">Sleep score</h2>
-              <Moon className="h-4 w-4 text-iris" />
-            </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="font-display text-5xl text-white text-glow">
-                {sleepScore > 0 ? sleepScore : "—"}
+            <SectionLabel label="Recovery" />
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className={`font-display text-5xl font-light text-white ${sleepScore ? "text-glow" : ""}`}>
+                {sleepScore !== null ? sleepScore : "—"}
               </span>
-              <span className="text-sm text-white/60">/ 100</span>
+              <span className="text-[13px] text-white/40">/ 100</span>
             </div>
-            <p className="mt-1 text-sm text-white/60">
-              {sleepHours > 0
-                ? `${sleepHours.toFixed(1)}h last night`
-                : "No sleep data yet — sync your Amazfit Bip 6"}
-            </p>
-            <div className="mt-5 space-y-2.5 text-xs">
+            {recoveryInterpretation && (
+              <p className="mt-2 text-[13px]" style={{
+                color: (sleepScore !== null && sleepScore < 70) ? "var(--color-attention)" : "var(--color-healthy)"
+              }}>
+                {recoveryInterpretation}
+              </p>
+            )}
+
+            <div className="atlas-divider my-5" />
+
+            <p className="atlas-label mb-3">Evidence</p>
+            <div className="space-y-2.5 text-[12px]">
               {[
-                [
-                  "Duration",
-                  sleepHours > 0
-                    ? `${Math.floor(sleepHours)}h ${Math.round((sleepHours % 1) * 60)}m`
-                    : "—",
-                  "iris",
-                ],
-                ["Score", sleepScore > 0 ? `${sleepScore}/100` : "—", "mint"],
-                ["Watch Sync", lastSyncedAt ? formatTime(lastSyncedAt) : "Not synced", "cyan-glow"],
-                ["Status", isLive ? "Live data" : "Polling…", "amber-glow"],
-              ].map(([k, v, c]) => (
-                <div
-                  key={k}
-                  className="flex items-center justify-between border-b border-white/5 pb-2 last:border-0"
-                >
-                  <span className="text-white/80">{k}</span>
-                  <span className={`font-mono text-${c}`}>{v}</span>
+                {
+                  label: "Sleep duration",
+                  value: sleepHours !== null ? `${Math.floor(sleepHours)}h ${Math.round((sleepHours % 1) * 60)}m` : null,
+                  color: sleepHours !== null && sleepHours < 7 ? "amber-glow" : "mint",
+                },
+                {
+                  label: "Resting HR",
+                  value: rhr !== null ? `${rhr} bpm` : null,
+                  color: rhr !== null && rhr > 60 ? "amber-glow" : "mint",
+                },
+                {
+                  label: "Last sync",
+                  value: lastSyncedAt ? formatTime(lastSyncedAt) : null,
+                  color: "cyan-glow",
+                },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="flex items-center justify-between border-b border-white/[0.04] pb-2.5 last:border-0 last:pb-0">
+                  <span className="text-white/60">{label}</span>
+                  {value ? (
+                    <span className="font-mono" style={{ color: `var(--color-${color})` }}>{value}</span>
+                  ) : (
+                    <span className="font-mono text-white/25">—</span>
+                  )}
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* ── METRICS ROW ─────────────────────────────────────── */}
+          <div className="col-span-12 grid grid-cols-2 gap-4 self-start lg:col-span-8 md:grid-cols-4">
+            {[
+              { label: "Resting HR",  value: rhr !== null ? `${rhr}` : "—",                     unit: "bpm",   icon: Heart,       color: "iris" },
+              { label: "Steps",       value: steps !== null ? steps.toLocaleString() : "—",     unit: "today", icon: Footprints,  color: "mint" },
+              { label: "Calories",    value: calories !== null ? calories.toLocaleString() : "—", unit: "kcal",  icon: Flame,       color: "amber-glow" },
+              { label: "Water",       value: water !== null ? `${water.toFixed(1)}L` : "—",     unit: "of 3L", icon: Droplet,     color: "cyan-glow" },
+            ].map((s) => (
+              <div key={s.label} className="glass-card flex items-center gap-3.5 p-4">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-white/10"
+                  style={{
+                    background: `color-mix(in oklab, var(--color-${s.color}) 12%, transparent)`,
+                    color: `var(--color-${s.color})`,
+                  }}
+                >
+                  <s.icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="atlas-label mb-0.5">{s.label}</p>
+                  <p className="font-display text-[20px] leading-none text-white">{s.value}</p>
+                  <p className="mt-0.5 text-[10px] text-white/35">{s.unit}</p>
+                </div>
+              </div>
+            ))}
+
+            {/* Heart rate chart */}
+            <div className="glass-card col-span-2 p-5 md:col-span-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[13px] font-medium text-white">Heart Rate</p>
+                  <p className="atlas-label mt-1">
+                    {hrData.length > 0 ? `${hrData.length} readings · live` : "No data available"}
+                  </p>
+                </div>
+                {hrData.length > 0 && (
+                  <div className="flex gap-2 text-[11px]">
+                    <span className="glass-pill px-2.5 py-1 text-iris">Min {hrMin}</span>
+                    <span className="glass-pill px-2.5 py-1 text-amber-glow">Max {hrMax}</span>
+                    <span className="glass-pill px-2.5 py-1 text-mint">Avg {hrAvg}</span>
+                  </div>
+                )}
+              </div>
+              <div className="h-40">
+                {hrData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={hrData}>
+                      <XAxis dataKey="t" hide />
+                      <YAxis hide domain={["dataMin - 10", "dataMax + 10"]} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line type="monotone" dataKey="bpm" stroke="var(--iris)" strokeWidth={1.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border border-white/[0.04] bg-white/[0.01]">
+                    <Database className="h-5 w-5 text-white/10 mb-2" />
+                    <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">Awaiting Sync</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Zepp sync badge */}
-          <ZeppSyncBadge />
-        </section>
-      </div>
+          {/* ── MACROS ──────────────────────────────────────────── */}
+          <section className="glass-card col-span-12 p-6 lg:col-span-4">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-[13px] font-medium text-white">Macros Today</p>
+              <Activity className="h-3.5 w-3.5 text-mint" />
+            </div>
+            <div className="mb-4 flex items-baseline gap-1.5">
+              <span className="font-display text-3xl text-white">
+                {totalCalories !== null ? totalCalories.toLocaleString() : "—"}
+              </span>
+              <span className="text-[11px] text-white/40">kcal</span>
+            </div>
+            {macros.length > 0 ? (
+              <div className="space-y-4">
+                {macros.map((m) => (
+                  <div key={m.name}>
+                    <div className="flex justify-between text-[12px]">
+                      <span className="text-white/65">{m.name}</span>
+                      <span className="font-mono text-white/45">{m.value}/{m.target}g</span>
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.min(100, (m.value / m.target) * 100)}%`,
+                          background: m.fill,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 flex flex-col items-center py-6 text-center">
+                <span className="font-mono text-[10px] text-white/20 uppercase tracking-widest mb-1">No macros logged</span>
+                <span className="text-[11px] text-white/40">Log meals via Atlas AI</span>
+              </div>
+            )}
+          </section>
+
+          {/* ── WEIGHT TREND ────────────────────────────────────── */}
+          <section className="glass-card col-span-12 p-6 lg:col-span-8">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-[13px] font-medium text-white">Weight Trend</p>
+              <p className="atlas-label">
+                {weightTrend.length > 0 ? `${weightTrend.length} data points · 90d` : "No data available"}
+              </p>
+            </div>
+            <div className="h-44">
+              {weightTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weightTrend}>
+                    <defs>
+                      <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--color-healthy)" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="var(--color-healthy)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="d" hide />
+                    <YAxis hide domain={["dataMin - 0.5", "dataMax + 0.5"]} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Area type="monotone" dataKey="w" stroke="var(--color-healthy)" strokeWidth={1.5} fill="url(#wg)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border border-white/[0.04] bg-white/[0.01]">
+                  <Scale className="h-5 w-5 text-white/10 mb-2" />
+                  <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">Connect OKOK Scale</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

@@ -15,6 +15,7 @@ import zeppSyncRoutes from "./routes/zeppSync.js";
 import { startGmailPoller } from "./services/gmailPoller.js";
 import { startZeppMockPoller } from "./services/zeppMockPoller.js";
 import syncRoutes from "./routes/sync.js";
+import { initializeContextEngine } from "./services/context/eventListener.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -56,6 +57,14 @@ app.get("/api/ping", (_req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
+import streamRoutes from "./routes/stream.js";
+
+import memoryRoutes from "./routes/memory.js";
+
+import automationsRoutes from "./routes/automations.js";
+import recommendationsRoutes from "./routes/recommendations.js";
+import plansRoutes from "./routes/plans.js";
+
 // ─── Core routes ─────────────────────────────────────────────────────────────
 app.use("/api/habits", habitRoutes);
 app.use("/api/focus", focusRoutes);
@@ -63,7 +72,12 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/gym", gymRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/memory", memoryRoutes);
+app.use("/api/automations", automationsRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/plans", plansRoutes);
 app.use("/api", aiRoutes); // /api/chat, /api/conversations, /api/models
+app.use("/api/stream", streamRoutes);
 
 // ─── Integration routes ───────────────────────────────────────────────────────
 app.use("/api/integrations/gmail", integrationsRoutes);
@@ -75,6 +89,8 @@ app.use(errorHandler);
 
 async function start() {
   await connectDB();
+  
+  initializeContextEngine();
 
   // Start background services
   const gmailInterval = parseInt(process.env.GMAIL_POLL_INTERVAL_MS ?? "300000", 10);

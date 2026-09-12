@@ -1,5 +1,18 @@
-import { useState, useCallback, useEffect, createContext, useContext, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, createContext, useContext, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
+
+export interface SpeechRecognitionEvent {
+  results: { [key: number]: { [key: number]: { transcript: string }; length: number }; length: number };
+}
+export interface SpeechRecognition {
+  continuous: boolean; interimResults: boolean;
+  onresult: (e: SpeechRecognitionEvent) => void;
+  onerror: (e: Event & { error?: string }) => void;
+  onend: () => void;
+  start: () => void; stop: () => void;
+}
+
+export type VoiceState = "IDLE" | "LISTENING" | "THINKING" | "ACTING" | "SPEAKING" | "ERROR";
 
 export interface Message {
   role: "user" | "assistant";
@@ -15,7 +28,7 @@ interface ChatContextType {
   loading: boolean;
   error: string | null;
   availableModels: string[];
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, options?: { isVoice?: boolean }) => Promise<void>;
   toggleChat: () => void;
   closeChat: () => void;
   openChat: () => void;
@@ -23,7 +36,12 @@ interface ChatContextType {
   setActiveModel: (model: string) => void;
   voiceOutputEnabled: boolean;
   toggleVoiceOutput: () => void;
-  isSpeaking: boolean;
+  voiceState: VoiceState;
+  setVoiceState: (state: VoiceState) => void;
+  stopTTS: () => void;
+  startListening: () => void;
+  stopListening: () => void;
+  transcript: string;
 }
 
 const ChatContext = createContext<ChatContextType | null>(null);
@@ -72,7 +90,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>("IDLE");
   const [availableModels, setAvailableModels] = useState<string[]>(["qwen3:latest", "cloud"]);
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState<boolean>(() => {
     if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
@@ -80,6 +98,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
     return false;
   });
+
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const latestTranscriptRef = useRef("");
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // We use a ref to sendMessage so STT can call it without re-binding
+  // but we can't do that yet because sendMessage is defined later.
+  // Instead, we define a callback that reads a ref or we just define startListening later.
 
   const toggleVoiceOutput = useCallback(() => setVoiceOutputEnabled((v) => !v), []);
 
@@ -143,8 +170,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const speakMessage = useCallback((text: string) => {
-    if (!voiceOutputEnabled || typeof window === "undefined" || !window.speechSynthesis) return;
+  const speakMessage = useCallback((text: string, forceSpeak: boolean = false) => {
+    if ((!voiceOutputEnabled && !forceSpeak) || typeof window === "undefined" || !window.speechSynthesis) return false;
     
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
@@ -168,22 +195,41 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     utterance.pitch = 0.9;
     utterance.rate = 1.05;
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onstart = () => setVoiceState("SPEAKING");
+    utterance.onend = () => setVoiceState("IDLE");
+    utterance.onerror = () => setVoiceState("IDLE");
     
     window.speechSynthesis.speak(utterance);
+    return true;
   }, [voiceOutputEnabled]);
 
+  const stopTTS = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setVoiceState("IDLE");
+    }
+  }, []);
+
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, options?: { isVoice?: boolean }) => {
       if (!text.trim() || loading) return;
 
       setError(null);
       setLoading(true);
+      setVoiceState("THINKING");
+
+      // Check if user is asking to stop
+      if (text.trim().toLowerCase() === "atlas, stop" || text.trim().toLowerCase() === "stop") {
+        stopTTS();
+        setVoiceState("IDLE");
+        setLoading(false);
+        return;
+      }
 
       const newMsg: Message = { role: "user", content: text.trim(), timestamp: new Date() };
       setMessages((prev) => [...prev, newMsg]);
+
+      let didSpeak = false;
 
       try {
         const res = await fetch("http://localhost:4000/api/chat", {
@@ -210,7 +256,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             ...prev,
             { role: "assistant", content: data.reply, timestamp: new Date() },
           ]);
-          speakMessage(data.reply);
+          didSpeak = speakMessage(data.voiceReply || data.reply, options?.isVoice);
         }
         if (data.conversationId) {
           setConversationId(data.conversationId);
@@ -226,12 +272,79 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             timestamp: new Date(),
           },
         ]);
+        setVoiceState("ERROR");
       } finally {
         setLoading(false);
+        // Transition back to IDLE if we are not actively speaking and no error occurred
+        if (!didSpeak) {
+           setVoiceState((current) => current === "THINKING" ? "IDLE" : current);
+        }
       }
     },
-    [loading, conversationId, activeModel, speakMessage],
+    [loading, conversationId, activeModel, speakMessage, stopTTS],
   );
+
+  const sendMessageRef = useRef(sendMessage);
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const SRC = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SRC) return;
+    recognitionRef.current = new SRC();
+    if (!recognitionRef.current) return;
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.onresult = (e: SpeechRecognitionEvent) => {
+      let t = "";
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      setTranscript(t);
+      latestTranscriptRef.current = t;
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (latestTranscriptRef.current.trim()) {
+          sendMessageRef.current(latestTranscriptRef.current, { isVoice: true });
+          setTranscript("");
+          latestTranscriptRef.current = "";
+          recognitionRef.current?.stop();
+        }
+      }, 1800);
+    };
+    recognitionRef.current.onerror = () => {
+      setVoiceState("IDLE");
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
+    recognitionRef.current.onend = () => {
+      setVoiceState((current) => current === "LISTENING" ? "IDLE" : current);
+    };
+
+    return () => {
+      recognitionRef.current?.stop();
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (recognitionRef.current) {
+      setTranscript("");
+      latestTranscriptRef.current = "";
+      recognitionRef.current.start();
+      setVoiceState("LISTENING");
+    } else {
+      alert("Speech recognition is not available in this browser.");
+    }
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    recognitionRef.current?.stop();
+    setVoiceState((current) => current === "LISTENING" ? "IDLE" : current);
+    if (latestTranscriptRef.current.trim()) {
+      sendMessage(latestTranscriptRef.current, { isVoice: true });
+      setTranscript("");
+      latestTranscriptRef.current = "";
+    }
+  }, [sendMessage]);
 
   const toggleChat = useCallback(() => setIsOpen((o) => !o), []);
   const closeChat = useCallback(() => setIsOpen(false), []);
@@ -265,7 +378,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setActiveModel,
         voiceOutputEnabled,
         toggleVoiceOutput,
-        isSpeaking,
+        voiceState,
+        setVoiceState,
+        stopTTS,
+        startListening,
+        stopListening,
+        transcript,
       }}
     >
       {children}

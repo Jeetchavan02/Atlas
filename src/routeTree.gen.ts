@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SyncRouteImport } from './routes/sync'
+import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as HabitsRouteImport } from './routes/habits'
 import { Route as GymRouteImport } from './routes/gym'
 import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as AutomationsRouteImport } from './routes/automations'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -26,6 +28,11 @@ const TasksRoute = TasksRouteImport.update({
 const SyncRoute = SyncRouteImport.update({
   id: '/sync',
   path: '/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemoryRoute = MemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HealthRoute = HealthRouteImport.update({
@@ -48,6 +55,11 @@ const CalendarRoute = CalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AutomationsRoute = AutomationsRouteImport.update({
+  id: '/automations',
+  path: '/automations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiRoute = AiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -62,20 +74,24 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automations': typeof AutomationsRoute
   '/calendar': typeof CalendarRoute
   '/gym': typeof GymRoute
   '/habits': typeof HabitsRoute
   '/health': typeof HealthRoute
+  '/memory': typeof MemoryRoute
   '/sync': typeof SyncRoute
   '/tasks': typeof TasksRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automations': typeof AutomationsRoute
   '/calendar': typeof CalendarRoute
   '/gym': typeof GymRoute
   '/habits': typeof HabitsRoute
   '/health': typeof HealthRoute
+  '/memory': typeof MemoryRoute
   '/sync': typeof SyncRoute
   '/tasks': typeof TasksRoute
 }
@@ -83,10 +99,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automations': typeof AutomationsRoute
   '/calendar': typeof CalendarRoute
   '/gym': typeof GymRoute
   '/habits': typeof HabitsRoute
   '/health': typeof HealthRoute
+  '/memory': typeof MemoryRoute
   '/sync': typeof SyncRoute
   '/tasks': typeof TasksRoute
 }
@@ -95,30 +113,36 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai'
+    | '/automations'
     | '/calendar'
     | '/gym'
     | '/habits'
     | '/health'
+    | '/memory'
     | '/sync'
     | '/tasks'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ai'
+    | '/automations'
     | '/calendar'
     | '/gym'
     | '/habits'
     | '/health'
+    | '/memory'
     | '/sync'
     | '/tasks'
   id:
     | '__root__'
     | '/'
     | '/ai'
+    | '/automations'
     | '/calendar'
     | '/gym'
     | '/habits'
     | '/health'
+    | '/memory'
     | '/sync'
     | '/tasks'
   fileRoutesById: FileRoutesById
@@ -126,10 +150,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiRoute: typeof AiRoute
+  AutomationsRoute: typeof AutomationsRoute
   CalendarRoute: typeof CalendarRoute
   GymRoute: typeof GymRoute
   HabitsRoute: typeof HabitsRoute
   HealthRoute: typeof HealthRoute
+  MemoryRoute: typeof MemoryRoute
   SyncRoute: typeof SyncRoute
   TasksRoute: typeof TasksRoute
 }
@@ -148,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/sync'
       fullPath: '/sync'
       preLoaderRoute: typeof SyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memory': {
+      id: '/memory'
+      path: '/memory'
+      fullPath: '/memory'
+      preLoaderRoute: typeof MemoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/health': {
@@ -178,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/automations': {
+      id: '/automations'
+      path: '/automations'
+      fullPath: '/automations'
+      preLoaderRoute: typeof AutomationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ai': {
       id: '/ai'
       path: '/ai'
@@ -198,10 +238,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiRoute: AiRoute,
+  AutomationsRoute: AutomationsRoute,
   CalendarRoute: CalendarRoute,
   GymRoute: GymRoute,
   HabitsRoute: HabitsRoute,
   HealthRoute: HealthRoute,
+  MemoryRoute: MemoryRoute,
   SyncRoute: SyncRoute,
   TasksRoute: TasksRoute,
 }

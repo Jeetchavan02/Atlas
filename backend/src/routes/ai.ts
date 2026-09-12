@@ -4,6 +4,8 @@ import HealthMetric from "../models/HealthMetric.js";
 import Task from "../models/Task.js";
 import Habit from "../models/Habit.js";
 import { searchWeb } from "../services/webSearch.js";
+import { executeAiToolLoop } from "../services/aiExecutor.js";
+import { ContextEngine } from "../services/context/ContextEngine.js";
 
 const router = Router();
 
@@ -83,21 +85,13 @@ async function callOllama(
 
 /** Helper to detect configured AI keys */
 function getAiConfig() {
-  const rawKey =
-    process.env.GROQ_API_KEY ||
-    process.env.GROK_API_KEY ||
-    process.env.XAI_API_KEY ||
-    "";
-
-  const isGroq = rawKey.startsWith("gsk_") || Boolean(process.env.GROQ_API_KEY);
-  const isGrok = rawKey.startsWith("xai-") || Boolean(process.env.XAI_API_KEY);
+  const rawKey = process.env.GROQ_API_KEY || "";
+  const isGroq = Boolean(rawKey);
 
   return {
     rawKey,
     isGroq,
-    isGrok,
-    groqModel: process.env.GROQ_MODEL || "llama3-70b-8192",
-    grokModel: process.env.GROK_MODEL || "grok-beta",
+    groqModel: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
   };
 }
 
@@ -231,82 +225,53 @@ async function callCloud(
 }
 
 /** Build a rich, real-time system prompt from live DB data */
-async function buildSystemPrompt(searchContext?: string): Promise<string> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+async function buildSystemPrompt(searchContext?: string, intent?: string): Promise<string> {
+  const snapshot = await ContextEngine.buildSnapshot(intent || null);
+  
+  console.log("[ContextEngine] Generated Insights:", JSON.stringify(snapshot.insights, null, 2));
 
-  // Pull richer context — gym sessions, weight, HRV too
-  const [health, tasks, habits] = await Promise.allSettled([
-    HealthMetric.findOne({ date: today }),
-    Task.find({ done: false }).sort({ priority: -1 }).limit(5),
-    Habit.find({}).sort({ currentStreak: -1 }).limit(6),
-  ]);
+  const dateStr = snapshot.context.date;
+  const timeStr = snapshot.context.time;
 
-  const h = health.status === "fulfilled" ? health.value : null;
-  const t = tasks.status === "fulfilled" ? tasks.value : [];
-  const hb = habits.status === "fulfilled" ? habits.value : [];
+  // Format context cleanly as JSON for the AI to parse easily
+  const contextStr = JSON.stringify(snapshot.context, null, 2);
+  const insightsStr = snapshot.insights.length > 0 
+    ? "SYSTEM INSIGHTS (Conflicts/Risks/Opportunities):\n" + JSON.stringify(snapshot.insights, null, 2)
+    : "SYSTEM INSIGHTS: None detected.";
 
-  // Build rich health context string
-  let healthCtx = "";
-  if (h) {
-    const parts: string[] = [];
-    if (h.sleepHours) parts.push(`Sleep: ${h.sleepHours}h (score ${h.sleepScore}/100)`);
-    if (h.restingHeartRate) parts.push(`RHR: ${h.restingHeartRate} bpm`);
-    if (h.hrv) parts.push(`HRV: ${h.hrv} ms`);
-    if (h.steps) parts.push(`Steps: ${h.steps.toLocaleString()}`);
-    if (h.caloriesBurned) parts.push(`Cals burned: ${h.caloriesBurned}`);
-    if (h.weight) parts.push(`Weight: ${h.weight} kg`);
-    if (h.liveHeartRate) parts.push(`Live HR: ${h.liveHeartRate} bpm`);
-    if (h.spo2) parts.push(`SpO2: ${h.spo2}%`);
-    if (h.recoveryScore) parts.push(`Recovery: ${h.recoveryScore}/100`);
-    if (h.waterLiters) parts.push(`Water: ${h.waterLiters}L`);
-    if (h.activeSessions && h.activeSessions.length > 0) {
-      const lastSession = h.activeSessions[h.activeSessions.length - 1];
-      parts.push(`Last workout: ${lastSession.type} (${lastSession.durationMin} min, ${lastSession.caloriesBurned ?? "?"} cals)`);
-    }
-    healthCtx = parts.length > 0 ? parts.join(". ") + "." : "Sensors synced but no specific metrics recorded today.";
-  } else {
-    healthCtx = "Health sensors not synced today — data unavailable.";
-  }
+  return `You are ATLAS — A Life Tracking Analysis System. You are a sharp, highly intelligent personal AI operating system.
 
-  const taskCtx =
-    t.length > 0
-      ? `Pending tasks: ${t.map((x) => `"${x.title}" [${x.priority} priority]`).join(", ")}.`
-      : "No pending tasks. Either everything is done, or nothing was added.";
-
-  const habitCtx =
-    hb.length > 0
-      ? `Active habits: ${hb.map((x) => `${x.name} (${x.currentStreak}-day streak)`).join(", ")}.`
-      : "No habits being tracked yet.";
-
-  const dateStr = new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  return `You are ATLAS — A Life Tracking Analysis System. You are a sharp, highly intelligent personal AI operating system. You address the user as "Sir".
-
-PERSONALITY:
-- You have dry, sophisticated wit — like J.A.R.V.I.S from Iron Man. Occasionally deadpan, occasionally sarcastic, but always substantive.
+PERSONALITY & TONE:
+- Calm, concise, and direct.
+- Do NOT use theatrical language. NEVER address the user as "Sir".
 - Vary your tone and phrasing. Never repeat the same observation two messages in a row.
-- You are NOT a wellness bot. Do NOT suggest "cold plunge", "journaling", or generic wellness advice unprompted. Only suggest specific actions if the data clearly calls for it.
-- When the user asks a general question (e.g. sports, tech, news), answer it directly. You are a full general-purpose intelligence — not just a health tracker.
-- Reference actual numbers from the context when relevant — not vague summaries.
-- When data is missing, note it with dry humour once, then move on.
-- NEVER hallucinate live sports scores, betting odds, or real-time facts. If the LIVE SEARCH RESULTS do not specify the exact score, odds, or status, state clearly and politely that the live search data did not contain the current details, and do NOT make up numbers or guess.
+- You are a full general-purpose intelligence — answer normal questions directly.
+- NEVER invent precise actions, measurements, or recommendations without evidence. Keep reasoning bounded.
+- Maintain a strict distinction between: FACT (data you have), INSIGHT (your evaluation), RECOMMENDATION (what you suggest), SPECULATION (what you lack data for).
 
-TODAY — ${dateStr}
-HEALTH: ${healthCtx}
-TASKS: ${taskCtx}
-HABITS: ${habitCtx}
+INTENT MODES (Your 4 modes of operation):
+1. ASK: The user is asking a question. Answer concisely based ONLY on the context. If data is STALE or UNAVAILABLE, state the uncertainty explicitly. DO NOT treat missing data as zero.
+2. COMMAND: The user wants a single safe action. Use a LOW risk tool to fulfill it.
+3. PLAN: The user requests a complex orchestrating change (e.g. "Fix my evening") or a HIGH/DESTRUCTIVE risk action. You MUST use the 'core.propose_action_plan' tool to propose the changes instead of executing them blindly.
+4. CLARIFY: You lack sufficient info to safely act. Ask a concise clarifying question.
+
+TODAY — ${dateStr} ${timeStr}
+
+ATLAS CONTEXT SNAPSHOT:
+(Note: 'dataState' will indicate LIVE, STALE, or UNAVAILABLE)
+${contextStr}
+
+${insightsStr}
 
 RULES:
-- Keep responses to 1–3 sentences maximum. Under 60 words unless explicitly asked for more detail.
-- Plain text only. No markdown, no bullet points, no headers.
-- If asked about something outside health/tasks, just answer it normally like a smart assistant would.
-- NEVER start two consecutive responses with the same phrase.
+- You must generate a highly concise, speech-optimized response wrapped in <voice> tags. This voice response MUST be maximum 2-3 sentences, use natural spoken language, and communicate the core conclusion or most important answer without reading lists, tables, or long explanations.
+- Example: <voice>Today, finish Design AI first. Your recovery is low, so keep training light and prioritize sleep.</voice>
+- Outside of the <voice> tags, provide the full detailed response for the UI.
+- However, do not dump the entire ContextSnapshot into the detailed response. Use progressive disclosure: answer the immediate question first, expand and list details only when the user explicitly asks for details, explanation, a plan, a summary, or multiple options.
+- If data is UNAVAILABLE, explicitly say so (e.g., "Your health data is unavailable right now."). Do NOT invent a number.
+- If data is STALE, mention it (e.g., "Your last recorded recovery was X, but it hasn't synced recently.").
+- If the user is asking WHY, WHAT, or HOW about an existing response, recommendation, action, or decision, this is ALWAYS an ASK intent. DO NOT use 'core.propose_action_plan'. DO NOT execute any actions. Simply answer concisely based on the context.
+- If you classify the intent as PLAN (e.g. "Plan my evening" or handling a complex multi-step orchestration or any MEDIUM/HIGH/DESTRUCTIVE tool), you MUST ONLY call 'core.propose_action_plan'. DO NOT call the underlying tools directly. Under NO circumstances should you call 'tasks.create' or other direct tools when creating a plan. Instead, add them as steps inside 'core.propose_action_plan'.
 ` + (searchContext ? `\n\nLIVE SEARCH RESULTS (Real-time Internet Data):\n${searchContext}` : "");
 }
 
@@ -333,12 +298,13 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
       timestamp: new Date(),
     });
 
-    const recentMessages = conversation.messages.slice(-20).map((m) => ({
+    const recentMessages = conversation.messages.slice(-6).map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
     let aiReply = "";
+    let voiceReply = "";
     let error: string | null = null;
 
     try {
@@ -349,53 +315,29 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
       }
 
       const aiConfig = getAiConfig();
-      const systemPrompt = await buildSystemPrompt(searchContext);
+      const systemPrompt = await buildSystemPrompt(searchContext, userMessage);
 
-      if (aiConfig.isGroq || model?.toLowerCase().includes("groq") || model?.toLowerCase().includes("llama")) {
-        aiReply = await callGroq(recentMessages, systemPrompt, model);
-      } else if (aiConfig.isGrok || model?.toLowerCase().includes("grok")) {
-        aiReply = await callGrok(recentMessages, systemPrompt, model);
-      } else if (model === "cloud" || model === "openai") {
-        try {
-          aiReply = await callCloud(recentMessages, systemPrompt);
-        } catch (cloudErr) {
-          if (aiConfig.isGroq) {
-            console.warn("[ai-router] Cloud query failed, falling back to Groq:", (cloudErr as Error).message);
-            aiReply = await callGroq(recentMessages, systemPrompt);
-          } else if (aiConfig.isGrok) {
-            console.warn("[ai-router] Cloud query failed, falling back to Grok:", (cloudErr as Error).message);
-            aiReply = await callGrok(recentMessages, systemPrompt);
-          } else {
-            console.warn("[ai-router] Cloud query failed, falling back to local Ollama:", (cloudErr as Error).message);
-            aiReply = await callOllama(recentMessages, systemPrompt);
-          }
-        }
+      if (aiConfig.isGroq) {
+        const result = await executeAiToolLoop(
+          aiConfig.rawKey, 
+          aiConfig.groqModel, 
+          systemPrompt, 
+          userMessage, 
+          recentMessages.slice(0, -1)
+        );
+        aiReply = result.reply;
+        voiceReply = result.voiceReply || "";
       } else {
-        try {
-          aiReply = await callOllama(recentMessages, systemPrompt, model);
-        } catch (ollamaErr) {
-          if (aiConfig.isGroq) {
-            console.warn("[ai-router] Ollama unavailable, falling back to Groq:", (ollamaErr as Error).message);
-            aiReply = await callGroq(recentMessages, systemPrompt);
-          } else if (aiConfig.isGrok) {
-            console.warn("[ai-router] Ollama unavailable, falling back to Grok:", (ollamaErr as Error).message);
-            aiReply = await callGrok(recentMessages, systemPrompt);
-          } else {
-            throw ollamaErr;
-          }
-        }
+        throw new Error("Atlas Intelligence Offline");
       }
     } catch (e) {
       const msg = (e as Error).message || "";
-      if (msg.includes("Groq") || msg.includes("GROQ_API_KEY")) {
+      if (msg === "Atlas Intelligence Offline") {
+        error = "Atlas Intelligence Offline. GROQ_API_KEY is missing or invalid in the backend configuration.";
+      } else if (msg.includes("Groq") || msg.includes("GROQ_API_KEY")) {
         error = `Groq API error: ${msg}`;
-      } else if (msg.includes("GROK_API_KEY") || msg.includes("xAI Grok")) {
-        error = `Grok API error: ${msg}`;
       } else if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
-        error = "AI service offline. Please check your network or local AI configuration.";
-      } else if (msg.includes("not found")) {
-        const modelTag = model || "configured model";
-        error = `Model '${modelTag}' was not found.`;
+        error = "Atlas Intelligence Offline. Network error or service unavailable.";
       } else if (msg.includes("aborted") || msg.includes("AbortError")) {
         error = "Request timed out after 30 seconds.";
       } else {
@@ -414,6 +356,7 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
 
     res.json({
       reply: aiReply,
+      voiceReply: voiceReply || undefined,
       conversationId: conversation._id,
       error: error || undefined,
     });

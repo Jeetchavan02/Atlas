@@ -1,141 +1,331 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   Brain,
   Calendar,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Command,
+  Cpu,
   Dumbbell,
   Home,
+  Bell,
+  RefreshCw,
+  Settings,
   Sparkles,
   Wind,
-  Settings,
-  RefreshCw,
+  Zap,
+  Circle,
 } from "lucide-react";
+import React, { useState } from "react";
 import type { ReactNode } from "react";
-import { useState } from "react";
 import meshBg from "@/assets/atlas-mesh.jpg";
 import { WallpaperThemeSelector } from "@/components/WallpaperThemeSelector";
 import { useZeppSync } from "@/hooks/useZeppSync";
+import { useActivity } from "@/context/ActivityContext";
+import { ActivityCenter } from "@/components/ActivityCenter";
+import { useGlobalChat } from "@/context/ChatContext";
 
-const nav = [
-  { to: "/", icon: Home, label: "Mission" },
-  { to: "/ai", icon: Brain, label: "Atlas AI" },
-  { to: "/tasks", icon: CheckSquare, label: "Tasks" },
-  { to: "/habits", icon: Wind, label: "Habits" },
-  { to: "/gym", icon: Dumbbell, label: "Gym" },
-  { to: "/health", icon: Activity, label: "Health" },
-  { to: "/calendar", icon: Calendar, label: "Calendar" },
-  { to: "/sync", icon: RefreshCw, label: "Sync Data" },
-] as const;
+// ── Navigation structure ──────────────────────────────────────────
+const navGroups = [
+  {
+    label: "Home",
+    items: [
+      { to: "/", icon: Home, label: "Mission Control", exact: true },
+    ],
+  },
+  {
+    label: "Life",
+    items: [
+      { to: "/tasks",    icon: CheckSquare, label: "Tasks",    exact: false },
+      { to: "/calendar", icon: Calendar,    label: "Calendar", exact: false },
+      { to: "/habits",   icon: Wind,        label: "Habits",   exact: false },
+      { to: "/gym",      icon: Dumbbell,    label: "Gym",      exact: false },
+      { to: "/health",   icon: Activity,    label: "Health",   exact: false },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { to: "/ai",          icon: Brain,     label: "Atlas AI",    exact: false },
+      { to: "/memory",      icon: Cpu,       label: "Memory",      exact: false },
+      { to: "/automations", icon: Zap,       label: "Automations", exact: false },
+      { to: "/sync",        icon: RefreshCw, label: "Devices",     exact: false },
+    ],
+  },
+] satisfies { label: string; items: { to: string; icon: React.ElementType; label: string; exact: boolean }[] }[];
 
+// ── Shell ─────────────────────────────────────────────────────────
 export function AtlasShell({ children }: { children: ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const { status: zeppStatus } = useZeppSync();
+  const { unreadCount } = useActivity();
+  const { loading: aiLoading, error: aiError } = useGlobalChat();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const sidebarW = collapsed ? 52 : 208;
+
+  // Derive Atlas system state from real application state
+  const atlasState: "online" | "processing" | "degraded" =
+    aiError ? "degraded" : aiLoading ? "processing" : "online";
+
+  const stateColor =
+    atlasState === "online"     ? "var(--color-healthy)" :
+    atlasState === "processing" ? "var(--color-live)"    :
+                                  "var(--color-attention)";
+
+  const stateLabel =
+    atlasState === "online"     ? "Online"     :
+    atlasState === "processing" ? "Working…"  :
+                                  "Degraded";
 
   return (
     <div className="relative min-h-screen overflow-hidden text-foreground">
-      {/* Ambient background */}
+      {/* Ambient background — subtle, not dominant */}
       <img
         src={meshBg}
         alt=""
         width={1920}
         height={1280}
-        className="pointer-events-none fixed inset-0 h-full w-full object-cover opacity-90 transition-all duration-700"
+        className="pointer-events-none fixed inset-0 h-full w-full object-cover opacity-[0.55] transition-all duration-700"
         style={{ filter: "var(--bg-image-filter, none)" }}
       />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--bg-glow-1),transparent_60%),radial-gradient(ellipse_at_bottom_left,var(--bg-glow-2),transparent_55%)]" />
-      <div className="pointer-events-none fixed inset-0 bg-background/60 backdrop-blur-3xl" />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,oklch(0.08_0.03_270/0.75))]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--bg-glow-1),transparent_65%),radial-gradient(ellipse_at_bottom_left,var(--bg-glow-2),transparent_60%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-background/72 backdrop-blur-3xl" />
 
       <div className="relative flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="sticky top-0 z-30 flex h-screen w-[72px] flex-col items-center gap-1.5 py-5">
-          <Link
-            to="/"
-            aria-label="Atlas Home"
-            className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_8px_24px_-8px_oklch(0_0_0/0.6)]"
+        {/* ── Sidebar ───────────────────────────────────────────── */}
+        <aside
+          className="sticky top-0 z-30 flex h-screen flex-col border-r border-white/[0.055] bg-[oklch(0.13_0.022_270/0.85)] backdrop-blur-2xl transition-[width] duration-200 ease-in-out"
+          style={{ width: sidebarW }}
+        >
+          {/* Identity row */}
+          <div
+            className={`flex items-center border-b border-white/[0.055] px-3 py-[14px] ${
+              collapsed ? "justify-center" : "gap-2.5"
+            }`}
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--gradient-iris)] shadow-[0_0_18px_oklch(0.7_0.2_290/0.7)]">
-              <Sparkles className="h-4 w-4 text-white" strokeWidth={2.5} />
-            </div>
-          </Link>
-
-          {nav.map((n) => (
             <Link
-              key={n.to}
-              to={n.to}
-              aria-label={n.label}
-              activeOptions={n.to === "/" ? { exact: true } : { exact: false }}
-              activeProps={{ className: "is-active bg-white/10 text-white" }}
-              inactiveProps={{ className: "text-white/50 hover:bg-white/5 hover:text-white/80" }}
-              className="group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all"
+              to="/"
+              aria-label="Atlas"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gradient-iris)]"
+              style={{ boxShadow: "0 0 12px -3px oklch(0.7 0.2 290 / 0.5)" }}
             >
-              <span className="absolute -left-2 h-5 w-[3px] rounded-r-full bg-iris shadow-[0_0_12px_var(--color-iris)] hidden group-[.is-active]:block" />
-              <n.icon className="h-[18px] w-[18px]" />
-              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
-                {n.label}
-              </span>
+              <Sparkles className="h-3 w-3 text-white" strokeWidth={2.5} />
             </Link>
-          ))}
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Zepp sync status dot */}
-          {zeppStatus && (
-            <div
-              className="group relative flex h-11 w-11 cursor-default items-center justify-center rounded-xl"
-              title={`Amazfit Bip 6 · ${zeppStatus.isLive ? "Live" : "Offline"}`}
-            >
-              <span className="relative flex h-2.5 w-2.5">
-                {zeppStatus.isLive && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
-                )}
-                <span
-                  className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                    zeppStatus.isLive ? "bg-mint shadow-[0_0_8px_var(--color-mint)]" : "bg-white/20"
-                  }`}
-                />
+            {!collapsed && (
+              <span className="text-[13px] font-semibold tracking-tight text-white/90">
+                Atlas
               </span>
-              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
-                {zeppStatus.isLive ? "Watch Live" : "Watch Offline"}
-              </span>
+            )}
+          </div>
+
+          {/* Ask Atlas shortcut */}
+          {!collapsed && (
+            <div className="px-2.5 pt-2.5">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+                  );
+                }}
+                className="flex w-full items-center gap-2 rounded-md border border-white/[0.07] bg-white/[0.03] px-2.5 py-[7px] text-[11px] text-white/30 transition-all hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white/50"
+                aria-label="Ask Atlas"
+              >
+                <Command className="h-2.5 w-2.5 shrink-0" />
+                <span className="flex-1 text-left">Ask Atlas</span>
+                <kbd className="font-mono text-[9px] text-white/20">⌘K</kbd>
+              </button>
             </div>
           )}
 
-          {/* Settings / Theme button */}
-          <div className="relative">
+          {collapsed && (
+            <div className="px-2 pt-2.5">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+                  );
+                }}
+                className="group relative flex w-full items-center justify-center rounded-md border border-white/[0.07] bg-white/[0.03] py-[7px] text-white/30 transition-all hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white/50"
+                aria-label="Ask Atlas"
+              >
+                <Command className="h-3 w-3" />
+                <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
+                  Ask Atlas  ⌘K
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* Nav groups */}
+          <nav className="flex-1 overflow-y-auto px-2 py-2" aria-label="Atlas navigation">
+            {navGroups.map((group) => (
+              <div key={group.label} className="mb-2">
+                {!collapsed && (
+                  <p className="atlas-label mb-0.5 px-2 py-1">{group.label}</p>
+                )}
+                {group.items.map((item) => {
+                  const isActive = item.exact
+                    ? pathname === item.to
+                    : pathname.startsWith(item.to) && item.to !== "/";
+
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      aria-label={item.label}
+                      className={`
+                        group relative mb-0.5 flex items-center rounded-md px-2 py-[7px] text-[12.5px] transition-all duration-150
+                        ${isActive
+                          ? "bg-white/[0.07] text-white"
+                          : "text-white/38 hover:bg-white/[0.04] hover:text-white/65"
+                        }
+                        ${collapsed ? "justify-center" : "gap-2.5"}
+                      `}
+                    >
+                      {isActive && (
+                        <span className="nav-indicator absolute left-0 top-1.5 bottom-1.5" />
+                      )}
+                      <item.icon
+                        className={`h-[14px] w-[14px] shrink-0 transition-colors ${
+                          isActive ? "text-iris" : ""
+                        }`}
+                      />
+                      {!collapsed && (
+                        <span className={isActive ? "font-medium" : ""}>{item.label}</span>
+                      )}
+                      {collapsed && (
+                        <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
+                          {item.label}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          {/* Bottom system tray */}
+          <div className="border-t border-white/[0.055] px-2 py-2 space-y-0.5">
+
+            {/* Activity */}
             <button
-              onClick={() => setThemeOpen((v) => !v)}
-              aria-label="Theme settings"
-              className={`group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
-                themeOpen
-                  ? "bg-white/10 text-iris"
-                  : "text-white/40 hover:bg-white/5 hover:text-white/70"
-              }`}
+              onClick={() => setActivityOpen(true)}
+              className={`group relative flex w-full items-center rounded-md px-2 py-[7px] text-[12.5px] text-white/38 transition-all hover:bg-white/[0.04] hover:text-white/65 ${collapsed ? "justify-center" : "gap-2.5"}`}
+              aria-label="Activity"
             >
-              <Settings className="h-[18px] w-[18px]" />
-              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
-                Theme
-              </span>
+              <div className="relative shrink-0">
+                <Bell className="h-[14px] w-[14px]" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-iris text-[7px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </div>
+              {!collapsed && <span className="flex-1 text-left">Activity</span>}
+              {collapsed && (
+                <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
+                  Activity
+                </span>
+              )}
             </button>
 
-            {/* Theme panel — anchored above the settings button */}
-            {themeOpen && (
-              <div className="absolute bottom-14 left-14 z-50">
-                <WallpaperThemeSelector onClose={() => setThemeOpen(false)} />
+            {/* Settings / theme */}
+            <div className="relative">
+              <button
+                onClick={() => setThemeOpen((v) => !v)}
+                aria-label="Settings"
+                className={`group relative flex w-full items-center rounded-md px-2 py-[7px] text-[12.5px] transition-all ${themeOpen ? "bg-white/[0.07] text-iris" : "text-white/38 hover:bg-white/[0.04] hover:text-white/65"} ${collapsed ? "justify-center" : "gap-2.5"}`}
+              >
+                <Settings className="h-[14px] w-[14px] shrink-0" />
+                {!collapsed && <span className="flex-1 text-left">Settings</span>}
+                {collapsed && (
+                  <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
+                    Settings
+                  </span>
+                )}
+              </button>
+              {themeOpen && (
+                <div className="absolute bottom-12 left-0 z-50">
+                  <WallpaperThemeSelector onClose={() => setThemeOpen(false)} />
+                </div>
+              )}
+            </div>
+
+            {/* Collapse toggle */}
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? "Expand" : "Collapse"}
+              className={`flex w-full items-center rounded-md px-2 py-[7px] text-[12.5px] text-white/22 transition-all hover:bg-white/[0.04] hover:text-white/45 ${collapsed ? "justify-center" : "gap-2.5"}`}
+            >
+              {collapsed ? (
+                <ChevronRight className="h-[14px] w-[14px]" />
+              ) : (
+                <>
+                  <ChevronLeft className="h-[14px] w-[14px] shrink-0" />
+                  <span className="flex-1 text-left text-[11px]">Collapse</span>
+                </>
+              )}
+            </button>
+
+            {/* Atlas system status — bottom-most, derived from real state */}
+            <div
+              className={`flex items-center rounded-md px-2 py-2 ${collapsed ? "justify-center" : "gap-2"}`}
+              title={`Atlas ${stateLabel}`}
+            >
+              {atlasState === "processing" ? (
+                <span className="live-indicator h-[5px] w-[5px]" style={{ animationDuration: "1.2s" }} />
+              ) : (
+                <Circle
+                  className="h-[5px] w-[5px] shrink-0 fill-current"
+                  style={{ color: stateColor }}
+                />
+              )}
+              {!collapsed && (
+                <span className="font-mono text-[9px]" style={{ color: stateColor, opacity: 0.7 }}>
+                  Atlas {stateLabel}
+                </span>
+              )}
+            </div>
+
+            {/* Zepp live dot */}
+            {zeppStatus && !collapsed && (
+              <div
+                className="flex items-center gap-2 px-2 py-1"
+                title={`${zeppStatus.deviceModel} · ${zeppStatus.isLive ? "Live" : "Offline"}`}
+              >
+                {zeppStatus.isLive ? (
+                  <span className="live-indicator h-[5px] w-[5px]" />
+                ) : (
+                  <Circle className="h-[5px] w-[5px] fill-current text-white/15" />
+                )}
+                <span className="font-mono text-[9px] text-white/30">
+                  {zeppStatus.isLive ? "Watch live" : "Watch offline"}
+                </span>
               </div>
             )}
           </div>
         </aside>
 
-        {/* Main */}
-        <main className="flex-1 min-w-0 px-6 py-8 md:px-10 lg:px-14">{children}</main>
+        {/* ── Main content ────────────────────────────────────── */}
+        <main className="flex-1 min-w-0 overflow-y-auto px-6 py-6 md:px-8 lg:px-10 xl:px-12">
+          {children}
+        </main>
       </div>
+
+      {/* Activity center */}
+      <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
     </div>
   );
 }
 
+// ── PageHeader ────────────────────────────────────────────────────
+// Deliberately minimal. Pages establish their own hierarchy.
 export function PageHeader({
   eyebrow,
   title,
@@ -148,18 +338,15 @@ export function PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <header className="mb-8 flex flex-wrap items-end justify-between gap-6">
+    <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
       <div>
         {eyebrow && (
-          <span className="glass-pill mb-3 inline-flex items-center gap-2 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/70">
-            <span className="h-1.5 w-1.5 rounded-full bg-mint shadow-[0_0_8px_var(--color-mint)]" />
-            {eyebrow}
-          </span>
+          <p className="atlas-label mb-2">{eyebrow}</p>
         )}
-        <h1 className="font-display text-4xl font-light tracking-tight text-white text-glow md:text-5xl">
-          {title}
-        </h1>
-        {subtitle && <p className="mt-2 text-base text-white/60">{subtitle}</p>}
+        <h1 className="atlas-heading">{title}</h1>
+        {subtitle && (
+          <p className="mt-1 text-[12.5px] text-white/40">{subtitle}</p>
+        )}
       </div>
       {right}
     </header>

@@ -15,6 +15,8 @@ import { AtlasShell } from "../components/atlas-shell";
 import { ThemeEngineProvider } from "../hooks/useThemeEngine";
 import { ChatProvider } from "../context/ChatContext";
 import { FloatingChat } from "../components/FloatingChat";
+import { ActivityProvider } from "../context/ActivityContext";
+import { CommandPalette } from "../components/CommandPalette";
 
 function NotFoundComponent() {
   return (
@@ -81,27 +83,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Atlas UI" },
+      { title: "Atlas OS" },
       {
         name: "description",
         content:
-          "Atlas Dashboard AI is a sleek, dark-mode personal dashboard that provides AI-driven insights and task management.",
+          "Atlas OS — a voice-first personal operating system that connects your devices, applications, data, schedule, goals and AI agents into one persistent context layer.",
       },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Atlas UI" },
+      { property: "og:title", content: "Atlas OS" },
       {
         property: "og:description",
         content:
-          "Atlas Dashboard AI is a sleek, dark-mode personal dashboard that provides AI-driven insights and task management.",
+          "Atlas OS — personal operating system for your life.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Atlas UI" },
+      { name: "twitter:title", content: "Atlas OS" },
       {
         name: "twitter:description",
         content:
-          "Atlas Dashboard AI is a sleek, dark-mode personal dashboard that provides AI-driven insights and task management.",
+          "Atlas OS — personal operating system for your life.",
       },
       {
         property: "og:image",
@@ -151,10 +151,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeEngineProvider>
         <ChatProvider>
-          <AtlasShell>
-            <Outlet />
-          </AtlasShell>
-          <FloatingChat />
+          <ActivityProvider>
+            <AtlasShell>
+              <Outlet />
+            </AtlasShell>
+            <FloatingChat />
+            <CommandPalette />
+          </ActivityProvider>
         </ChatProvider>
       </ThemeEngineProvider>
     </QueryClientProvider>

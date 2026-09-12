@@ -1,426 +1,176 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { Dumbbell, TrendingUp, Plus, Flame, X } from "lucide-react";
+import { Dumbbell, Plus, Flame, Clock, Calendar, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 import { PageHeader } from "@/components/atlas-shell";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 export const Route = createFileRoute("/gym")({
   head: () => ({
     meta: [
-      { title: "Gym — Atlas" },
-      {
-        name: "description",
-        content:
-          "Atlas Gym: training volume, progressive overload, PRs, and recovery in one calm view.",
-      },
-      { property: "og:title", content: "Gym — Atlas" },
-      { property: "og:description", content: "Training tracked beautifully." },
+      { title: "Gym — Atlas OS" },
+      { name: "description", content: "Atlas Gym: physical training log and metrics." },
     ],
   }),
   component: GymPage,
 });
 
-const splitColors = [
-  "oklch(0.7 0.2 290)",
-  "oklch(0.82 0.15 200)",
-  "oklch(0.78 0.16 165)",
-  "oklch(0.82 0.16 75)",
-];
+// Demo data
+const TODAY_SESSION = {
+  title: "Push Day — Hypertrophy",
+  status: "pending", // pending, active, completed
+  exercises: [
+    { name: "Incline Bench Press", sets: "3 × 8-10", weight: "75kg" },
+    { name: "Shoulder Press (DB)", sets: "3 × 10", weight: "24kg" },
+    { name: "Lateral Raises", sets: "4 × 15", weight: "12kg" },
+    { name: "Tricep Pushdown", sets: "3 × 12", weight: "27.5kg" },
+  ],
+};
 
-const todayPlan = [
-  { name: "Bench Press", sets: "4 × 8", weight: "85kg", pr: true },
-  { name: "Overhead Press", sets: "4 × 6", weight: "55kg", pr: false },
-  { name: "Incline Dumbbell", sets: "3 × 10", weight: "30kg", pr: false },
-  { name: "Cable Fly", sets: "3 × 12", weight: "20kg", pr: false },
-  { name: "Tricep Pushdown", sets: "4 × 12", weight: "32kg", pr: true },
+const MUSCLE_SPLIT = [
+  { group: "Chest",   recovery: 100, status: "Ready" },
+  { group: "Back",    recovery: 45,  status: "Recovering" },
+  { group: "Legs",    recovery: 80,  status: "Good" },
+  { group: "Shoulders", recovery: 100, status: "Ready" },
 ];
 
 function GymPage() {
-  const [volume, setVolume] = useState([
-    { day: "Mon", v: 0 },
-    { day: "Tue", v: 0 },
-    { day: "Wed", v: 0 },
-    { day: "Thu", v: 0 },
-    { day: "Fri", v: 0 },
-    { day: "Sat", v: 0 },
-    { day: "Sun", v: 0 },
-  ]);
-  const [split, setSplit] = useState<{ name: string; value: number; fill: string }[]>([]);
-  const [totalKg, setTotalKg] = useState(0);
-  const [sessions, setSessions] = useState(0);
-  const [prs, setPrs] = useState(0);
-  const [prNames, setPrNames] = useState("");
-  const [avgStrain, setAvgStrain] = useState(0);
-  const [sessionsCount, setSessionsCount] = useState(0);
+  const [sessionStatus, setSessionStatus] = useState(TODAY_SESSION.status);
 
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [sessionName, setSessionName] = useState("Push Day");
-  const [sessionDuration, setSessionDuration] = useState(60);
-  const [sessionStrain, setSessionStrain] = useState(14.2);
-  const [exercises, setExercises] = useState([
-    { name: "Bench Press", sets: 4, reps: 8, weight: 85, pr: false },
-  ]);
-
-  const handleAddExercise = () => {
-    setExercises([...exercises, { name: "", sets: 3, reps: 10, weight: 20, pr: false }]);
-  };
-
-  const handleUpdateExercise = (index: number, field: string, value: any) => {
-    const newEx = [...exercises];
-    newEx[index] = { ...newEx[index], [field]: value };
-    setExercises(newEx);
-  };
-
-  const handleRemoveExercise = (index: number) => {
-    setExercises(exercises.filter((_, i) => i !== index));
-  };
-
-  const handleLogSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sessionName.trim() || exercises.length === 0) return;
-
-    try {
-      const res = await fetch("http://localhost:4000/api/gym/log-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: sessionName,
-          duration: sessionDuration,
-          strain: sessionStrain,
-          exercises: exercises,
-        }),
-      });
-
-      if (res.ok) {
-        setIsSheetOpen(false);
-        setSessionName("Push Day");
-        setExercises([{ name: "Bench Press", sets: 4, reps: 8, weight: 85, pr: false }]);
-        // Refresh data ideally, but we'll just log for now
-        window.location.reload(); // Simple refresh to show updated graphs
-      }
-    } catch (err) {
-      console.error("Failed to log session", err);
-    }
-  };
-
-  useEffect(() => {
-    fetch("http://localhost:4000/api/gym/weekly-volume")
-      .then((r) => r.json())
-      .then((data) => {
-        setVolume(data.weeklyVolume);
-        setTotalKg(data.totalKg);
-      })
-      .catch(() => {});
-
-    fetch("http://localhost:4000/api/gym/stats")
-      .then((r) => r.json())
-      .then((data) => {
-        const colored = data.split.map((s: { name: string; value: number }, i: number) => ({
-          ...s,
-          fill: splitColors[i % splitColors.length],
-        }));
-        setSplit(colored);
-        setSessions(data.stats.sessionsThisWeek);
-        setPrs(data.stats.prs);
-        setPrNames(data.stats.prNames.slice(0, 2).join(" · "));
-        setAvgStrain(data.stats.avgStrain);
-        setSessionsCount(data.stats.sessionsThisWeek);
-      })
-      .catch(() => {});
-  }, []);
   return (
     <>
       <PageHeader
-        eyebrow="Push day · 60 min"
-        title="Gym"
-        subtitle="Progressive overload, one rep at a time."
+        eyebrow="Health · Gym"
+        title="Physical training."
+        subtitle="Workout tracking, muscular recovery, and programming."
         right={
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <button className="flex items-center gap-2 rounded-2xl bg-[var(--gradient-iris)] px-4 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-glow)] ring-1 ring-white/20">
-                <Plus className="h-4 w-4" /> Log set
-              </button>
-            </SheetTrigger>
-            <SheetContent className="w-[400px] overflow-y-auto sm:w-[600px] sm:max-w-xl">
-              <SheetHeader>
-                <SheetTitle>Log Gym Session</SheetTitle>
-                <SheetDescription>Record your sets, reps, and PRs.</SheetDescription>
-              </SheetHeader>
-              <form onSubmit={handleLogSession} className="space-y-6 pt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sessionName">Session Name</Label>
-                    <Input
-                      id="sessionName"
-                      value={sessionName}
-                      onChange={(e) => setSessionName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">Duration (min)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={sessionDuration}
-                      onChange={(e) => setSessionDuration(Number(e.target.value))}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Exercises</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddExercise}>
-                      <Plus className="mr-2 h-3 w-3" /> Add Exercise
-                    </Button>
-                  </div>
-
-                  {exercises.map((ex, i) => (
-                    <div
-                      key={i}
-                      className="relative rounded-xl border border-white/10 bg-white/5 p-4"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExercise(i)}
-                        className="absolute right-2 top-2 text-white/40 hover:text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="grid gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Exercise Name</Label>
-                          <Input
-                            value={ex.name}
-                            onChange={(e) => handleUpdateExercise(i, "name", e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Sets</Label>
-                            <Input
-                              type="number"
-                              value={ex.sets}
-                              onChange={(e) =>
-                                handleUpdateExercise(i, "sets", Number(e.target.value))
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Reps</Label>
-                            <Input
-                              type="number"
-                              value={ex.reps}
-                              onChange={(e) =>
-                                handleUpdateExercise(i, "reps", Number(e.target.value))
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Weight (kg)</Label>
-                            <Input
-                              type="number"
-                              value={ex.weight}
-                              onChange={(e) =>
-                                handleUpdateExercise(i, "weight", Number(e.target.value))
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2 pt-1">
-                          <Checkbox
-                            id={`pr-${i}`}
-                            checked={ex.pr}
-                            onCheckedChange={(c) => handleUpdateExercise(i, "pr", !!c)}
-                          />
-                          <Label
-                            htmlFor={`pr-${i}`}
-                            className="text-xs font-medium text-amber-glow"
-                          >
-                            Personal Record Target
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <SheetFooter className="pt-4 pb-10">
-                  <Button type="submit" className="w-full">
-                    Log Session
-                  </Button>
-                </SheetFooter>
-              </form>
-            </SheetContent>
-          </Sheet>
+          <button 
+            disabled
+            title="Coming in Phase 2"
+            className="flex items-center gap-2 rounded-lg bg-white/[0.05] px-4 py-2 text-[12.5px] font-medium text-white/40 cursor-not-allowed transition-all"
+          >
+            <Plus className="h-3.5 w-3.5" /> Log custom
+          </button>
         }
       />
 
       <div className="grid grid-cols-12 gap-5">
-        {[
-          {
-            label: "Weekly volume",
-            value: totalKg >= 1000 ? `${(totalKg / 1000).toFixed(1)}k` : `${totalKg}`,
-            hint: "kg lifted",
-            color: "iris",
-          },
-          { label: "Sessions", value: `${sessions} / 6`, hint: "this week", color: "mint" },
-          { label: "PRs", value: `${prs}`, hint: prNames || "this week", color: "amber-glow" },
-          { label: "Strain", value: avgStrain.toFixed(1), hint: "Whoop", color: "cyan-glow" },
-        ].map((s) => (
-          <section key={s.label} className="glass-card col-span-6 p-5 md:col-span-3">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-              {s.label}
-            </div>
-            <div className={`mt-2 font-display text-3xl font-light text-${s.color}`}>{s.value}</div>
-            <div className="mt-1 text-xs text-white/60">{s.hint}</div>
-          </section>
-        ))}
-
-        <section className="glass-card col-span-12 p-7 lg:col-span-7">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Weekly volume</h2>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-white/50">
-                Total kg moved
-              </p>
-            </div>
-            <TrendingUp className="h-4 w-4 text-mint" />
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={volume}>
-                <defs>
-                  <linearGradient id="vg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.7 0.2 290)" stopOpacity={1} />
-                    <stop offset="100%" stopColor="oklch(0.7 0.2 290)" stopOpacity={0.2} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="day"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "oklch(1 0 0 / 0.5)", fontSize: 11 }}
-                />
-                <YAxis hide />
-                <Tooltip
-                  cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
-                  contentStyle={{
-                    background: "oklch(0.18 0.03 270 / 0.9)",
-                    border: "1px solid oklch(1 0 0 / 0.1)",
-                    borderRadius: 12,
-                    color: "white",
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="v" fill="url(#vg)" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        <section className="glass-card col-span-12 p-7 lg:col-span-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-medium text-white">Muscle split</h2>
-            <Flame className="h-4 w-4 text-amber-glow" />
-          </div>
-          <p className="font-mono text-[11px] uppercase tracking-wider text-white/50">
-            Last 4 weeks
-          </p>
-          <div className="relative mt-2 h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={split}
-                  dataKey="value"
-                  innerRadius={55}
-                  outerRadius={92}
-                  paddingAngle={3}
-                  strokeWidth={0}
+        
+        {/* ── TODAY'S SESSION (Primary Focus) ────────────────── */}
+        <div className="col-span-12 lg:col-span-8">
+          <section className="glass-card p-6" style={sessionStatus === "active" ? { borderColor: "var(--iris)", boxShadow: "var(--shadow-glow-sm)" } : {}}>
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <p className="atlas-label mb-1">Today's Program</p>
+                <h2 className="text-[20px] font-semibold text-white">{TODAY_SESSION.title}</h2>
+                <div className="mt-1 flex items-center gap-3 text-[11.5px] text-white/40">
+                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> ~60 min</span>
+                  <span className="flex items-center gap-1"><Flame className="h-3 w-3" /> ~450 kcal</span>
+                  <span className="font-mono bg-white/[0.04] px-1.5 py-0.5 rounded text-white/30">Demo Plan</span>
+                </div>
+              </div>
+              
+              {sessionStatus === "pending" && (
+                <button
+                  onClick={() => setSessionStatus("active")}
+                  className="rounded-lg bg-white/[0.08] px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-white/[0.12]"
                 >
-                  {split.map((s, i) => (
-                    <Cell key={i} fill={s.fill} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <div className="font-display text-3xl text-white">{sessionsCount}</div>
-              <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-                sessions
-              </div>
+                  Start Session
+                </button>
+              )}
+              {sessionStatus === "active" && (
+                <button
+                  onClick={() => setSessionStatus("completed")}
+                  className="flex items-center gap-2 rounded-lg bg-[var(--color-healthy)] px-4 py-2 text-[12.5px] font-medium text-black transition-colors hover:brightness-110"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Complete
+                </button>
+              )}
+              {sessionStatus === "completed" && (
+                <span className="flex items-center gap-1.5 rounded-lg border border-[var(--color-healthy)]/30 bg-[var(--color-healthy)]/10 px-4 py-2 text-[12.5px] font-medium text-[var(--color-healthy)]">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Done
+                </span>
+              )}
             </div>
-          </div>
-          <div className="mt-2 grid grid-cols-4 gap-2 text-center">
-            {split.map((s) => (
-              <div key={s.name}>
-                <div className="mx-auto h-1 w-6 rounded-full" style={{ background: s.fill }} />
-                <div className="mt-1.5 text-[10px] text-white/60">{s.name}</div>
-                <div className="font-mono text-xs text-white">{s.value}%</div>
-              </div>
-            ))}
-          </div>
-        </section>
 
-        <section className="glass-card col-span-12 p-7">
-          <div className="mb-4 flex items-center gap-2">
-            <Dumbbell className="h-4 w-4 text-iris" />
-            <h2 className="text-base font-medium text-white">Today's session — Push</h2>
-            <span className="ml-auto font-mono text-[11px] text-white/50">
-              60 min · 5 exercises
-            </span>
-          </div>
-          <ul className="divide-y divide-white/5">
-            {todayPlan.map((e) => (
-              <li key={e.name} className="flex items-center gap-4 py-3 text-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-white/70 ring-1 ring-white/10">
-                  <Dumbbell className="h-4 w-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 text-white">
-                    {e.name}
-                    {e.pr && (
-                      <span className="rounded-full bg-amber-glow/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-glow ring-1 ring-amber-glow/30">
-                        PR target
-                      </span>
-                    )}
+            <div className="space-y-0 border-t border-white/[0.05]">
+              {TODAY_SESSION.exercises.map((ex, i) => (
+                <div key={i} className="flex items-center justify-between py-3 border-b border-white/[0.04] last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] text-white/20 w-4">{i + 1}.</span>
+                    <span className="text-[13px] text-white/80">{ex.name}</span>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-white/50">{e.sets}</div>
+                  <div className="flex items-center gap-4 text-[12px] font-mono text-white/40">
+                    <span className="w-16 text-right">{ex.sets}</span>
+                    <span className="w-12 text-right">{ex.weight}</span>
+                  </div>
                 </div>
-                <div className="font-mono text-sm text-white">{e.weight}</div>
-              </li>
-            ))}
-          </ul>
-        </section>
+              ))}
+            </div>
+            
+            {sessionStatus === "active" && (
+              <div className="mt-4 flex items-center justify-between rounded-md bg-[color-mix(in_oklab,var(--iris)_10%,transparent)] px-4 py-3 border border-[color-mix(in_oklab,var(--iris)_20%,transparent)]">
+                <div className="flex items-center gap-2">
+                  <span className="live-indicator h-1.5 w-1.5" style={{ background: "var(--iris)" }} />
+                  <span className="text-[12px] font-medium text-[var(--iris)]">Session active in background</span>
+                </div>
+                <span className="font-mono text-[11px] text-[var(--iris)]/60">00:14:22</span>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* ── SIDEBAR (Secondary info) ───────────────────────── */}
+        <div className="col-span-12 lg:col-span-4 space-y-5">
+          
+          <section className="surface-subtle p-5">
+            <p className="atlas-label mb-3">Muscle Recovery</p>
+            <div className="space-y-3.5">
+              {MUSCLE_SPLIT.map((m) => (
+                <div key={m.group}>
+                  <div className="flex justify-between text-[11.5px] mb-1">
+                    <span className="text-white/70">{m.group}</span>
+                    <span style={{ color: m.recovery > 80 ? "var(--color-healthy)" : "var(--color-attention)" }}>
+                      {m.status}
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${m.recovery}%`,
+                        background: m.recovery > 80 ? "var(--color-healthy)" : "var(--color-attention)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="surface-subtle p-5">
+            <p className="atlas-label mb-3">Recent Logs</p>
+            <div className="space-y-3">
+              {[
+                { d: "Yesterday", t: "Legs — Volume", info: "55 min" },
+                { d: "Thu", t: "Pull — Strength", info: "65 min" },
+                { d: "Wed", t: "Active Recovery", info: "30 min run" },
+              ].map((log) => (
+                <div key={log.d} className="flex justify-between items-center text-[12px]">
+                  <div className="flex gap-2">
+                    <span className="font-mono text-white/30 w-16">{log.d}</span>
+                    <span className="text-white/70">{log.t}</span>
+                  </div>
+                  <span className="text-white/30 text-[11px]">{log.info}</span>
+                </div>
+              ))}
+            </div>
+            <button className="mt-4 w-full text-center text-[11px] text-white/30 hover:text-white/60 transition-colors">
+              View all history
+            </button>
+          </section>
+
+        </div>
       </div>
     </>
   );
