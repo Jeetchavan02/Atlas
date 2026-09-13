@@ -16,6 +16,16 @@ dist-ssr
 .nitro
 *.local
 
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/dist/
+backend/node_modules/
+backend/logs/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

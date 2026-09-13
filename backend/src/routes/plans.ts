@@ -38,7 +38,7 @@ router.post("/:id/approve", async (req: Request, res: Response): Promise<any> =>
 
     for (const step of plan.steps) {
       try {
-        const result = await registry.execute(step.toolName, step.parameters);
+        const result = await registry.execute(step.toolName, step.parameters, { isApproved: true });
         results.push({ step: step.description, status: "SUCCESS", result });
       } catch (err) {
         console.error(`[plans] Step execution failed: ${step.toolName}`, err);

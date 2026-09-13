@@ -1,6 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  Activity,
   Brain,
   Calendar,
   CheckSquare,
@@ -8,13 +7,11 @@ import {
   ChevronRight,
   Command,
   Cpu,
-  Dumbbell,
   Home,
   Bell,
   RefreshCw,
   Settings,
   Sparkles,
-  Wind,
   Zap,
   Circle,
 } from "lucide-react";
@@ -28,33 +25,16 @@ import { ActivityCenter } from "@/components/ActivityCenter";
 import { useGlobalChat } from "@/context/ChatContext";
 
 // ── Navigation structure ──────────────────────────────────────────
-const navGroups = [
-  {
-    label: "Home",
-    items: [
-      { to: "/", icon: Home, label: "Mission Control", exact: true },
-    ],
-  },
-  {
-    label: "Life",
-    items: [
-      { to: "/tasks",    icon: CheckSquare, label: "Tasks",    exact: false },
-      { to: "/calendar", icon: Calendar,    label: "Calendar", exact: false },
-      { to: "/habits",   icon: Wind,        label: "Habits",   exact: false },
-      { to: "/gym",      icon: Dumbbell,    label: "Gym",      exact: false },
-      { to: "/health",   icon: Activity,    label: "Health",   exact: false },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { to: "/ai",          icon: Brain,     label: "Atlas AI",    exact: false },
-      { to: "/memory",      icon: Cpu,       label: "Memory",      exact: false },
-      { to: "/automations", icon: Zap,       label: "Automations", exact: false },
-      { to: "/sync",        icon: RefreshCw, label: "Devices",     exact: false },
-    ],
-  },
-] satisfies { label: string; items: { to: string; icon: React.ElementType; label: string; exact: boolean }[] }[];
+const primaryNav = [
+  { to: "/", icon: Home, label: "Home", exact: true },
+  { to: "/ai", icon: Brain, label: "Chat", exact: false },
+  { to: "/tasks", icon: CheckSquare, label: "Tasks", exact: false },
+  { to: "/calendar", icon: Calendar, label: "Calendar", exact: false },
+  // File management omitted until it has a route, but added structurally
+  { to: "/memory", icon: Cpu, label: "Memory", exact: false },
+  { to: "/automations", icon: Zap, label: "Automations", exact: false },
+  { to: "/sync", icon: RefreshCw, label: "Devices", exact: false },
+];
 
 // ── Shell ─────────────────────────────────────────────────────────
 export function AtlasShell({ children }: { children: ReactNode }) {
@@ -161,53 +141,48 @@ export function AtlasShell({ children }: { children: ReactNode }) {
             </div>
           )}
 
-          {/* Nav groups */}
-          <nav className="flex-1 overflow-y-auto px-2 py-2" aria-label="Atlas navigation">
-            {navGroups.map((group) => (
-              <div key={group.label} className="mb-2">
-                {!collapsed && (
-                  <p className="atlas-label mb-0.5 px-2 py-1">{group.label}</p>
-                )}
-                {group.items.map((item) => {
-                  const isActive = item.exact
-                    ? pathname === item.to
-                    : pathname.startsWith(item.to) && item.to !== "/";
+          {/* Primary Nav */}
+          <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Atlas navigation">
+            <div className="space-y-0.5">
+              {primaryNav.map((item) => {
+                const isActive = item.exact
+                  ? pathname === item.to
+                  : pathname.startsWith(item.to) && item.to !== "/";
 
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      aria-label={item.label}
-                      className={`
-                        group relative mb-0.5 flex items-center rounded-md px-2 py-[7px] text-[12.5px] transition-all duration-150
-                        ${isActive
-                          ? "bg-white/[0.07] text-white"
-                          : "text-white/38 hover:bg-white/[0.04] hover:text-white/65"
-                        }
-                        ${collapsed ? "justify-center" : "gap-2.5"}
-                      `}
-                    >
-                      {isActive && (
-                        <span className="nav-indicator absolute left-0 top-1.5 bottom-1.5" />
-                      )}
-                      <item.icon
-                        className={`h-[14px] w-[14px] shrink-0 transition-colors ${
-                          isActive ? "text-iris" : ""
-                        }`}
-                      />
-                      {!collapsed && (
-                        <span className={isActive ? "font-medium" : ""}>{item.label}</span>
-                      )}
-                      {collapsed && (
-                        <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
-                          {item.label}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    aria-label={item.label}
+                    className={`
+                      group relative flex items-center rounded-md px-2 py-[7px] text-[12.5px] transition-all duration-150
+                      ${isActive
+                        ? "bg-white/[0.07] text-white"
+                        : "text-white/38 hover:bg-white/[0.04] hover:text-white/65"
+                      }
+                      ${collapsed ? "justify-center" : "gap-2.5"}
+                    `}
+                  >
+                    {isActive && (
+                      <span className="nav-indicator absolute left-0 top-1.5 bottom-1.5" />
+                    )}
+                    <item.icon
+                      className={`h-[14px] w-[14px] shrink-0 transition-colors ${
+                        isActive ? "text-iris" : ""
+                      }`}
+                    />
+                    {!collapsed && (
+                      <span className={isActive ? "font-medium" : ""}>{item.label}</span>
+                    )}
+                    {collapsed && (
+                      <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded border border-white/10 bg-[oklch(0.14_0.025_270/0.97)] px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 z-50">
+                        {item.label}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
 
           {/* Bottom system tray */}

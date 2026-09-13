@@ -273,3 +273,556 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.08); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: oklch(1 0 0 / 0.15); }
+
+/* ══════════════════════════════════════════════════════════════════
+   ATLAS HOME — HMI 2.1 (Conversational Persistence)
+   ══════════════════════════════════════════════════════════════════ */
+
+.atlas-home {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 48px);
+  width: 100%;
+  padding: 24px 32px;
+  overflow: hidden;
+  color: oklch(0.92 0.008 270);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Atmospheric ambient glow */
+.atlas-home__ambient {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  width: clamp(400px, 50vw, 700px);
+  height: clamp(400px, 50vw, 700px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    oklch(0.35 0.15 290 / 0.12) 0%,
+    oklch(0.25 0.10 250 / 0.06) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  filter: blur(60px);
+  transition: all 0.8s ease;
+}
+
+/* Dim ambient glow slightly in conversation mode */
+.atlas-home--conversation .atlas-home__ambient {
+  opacity: 0.5;
+  transform: translate(10%, -65%) scale(0.6);
+}
+
+/* ── Topbar ──────────────────────────────────────────────────────── */
+.atlas-home__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.atlas-home__topbar-left {
+  width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+.atlas-home__topbar-date {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: oklch(0.7 0.02 270);
+}
+
+.atlas-home__collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 8px;
+  color: oklch(0.6 0.02 270);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: atlas-fade-in 0.4s ease-out;
+}
+
+.atlas-home__collapse-btn:hover {
+  background: oklch(1 0 0 / 0.08);
+  color: white;
+}
+
+.atlas-home__topbar-time {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  flex: 1;
+  text-align: center;
+}
+
+.atlas-home__topbar-right {
+  display: flex;
+  justify-content: flex-end;
+  width: 200px;
+}
+
+.atlas-home__topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 20px;
+  color: oklch(0.5 0.02 270);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.atlas-home__topbar-search:hover {
+  background: oklch(1 0 0 / 0.06);
+  color: oklch(0.8 0.02 270);
+}
+
+.atlas-home__topbar-search kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: oklch(0.4 0.02 270);
+  background: oklch(1 0 0 / 0.05);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* ── Main Stage ──────────────────────────────────────────────────── */
+.atlas-home__stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ── Sphere Area (Stateful placement) ────────────────────────────── */
+.atlas-home__sphere-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: 1;
+}
+
+.atlas-home--presence .atlas-home__sphere-area {
+  position: relative;
+}
+
+.atlas-home--conversation .atlas-home__sphere-area {
+  position: absolute;
+  top: 0;
+  right: 0;
+  flex: 0;
+  transform: scale(0.4) translateY(-10%);
+  transform-origin: top right;
+  z-index: 50;
+  margin-top: -30px;
+}
+
+.atlas-home__sphere-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.atlas-home__sphere-label {
+  position: absolute;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  font-size: 14px;
+  color: white;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+  animation: atlas-fade-in 0.8s ease-out;
+}
+
+.atlas-home__greeting-wrap {
+  text-align: center;
+  margin-top: 16px;
+  animation: atlas-fade-in 0.6s ease-out;
+}
+
+.atlas-home__greeting {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  font-weight: 300;
+  margin-bottom: 4px;
+}
+
+.atlas-home__subtitle {
+  font-size: 14px;
+  color: oklch(0.6 0.02 270);
+}
+
+.atlas-home__subtitle--listening {
+  color: oklch(0.8 0.15 200);
+  animation: atlas-fade-in 0.4s ease-out;
+}
+
+/* ── Conversation View ───────────────────────────────────────────── */
+.atlas-home__conversation {
+  position: absolute;
+  top: 40px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  animation: atlas-fade-in 0.6s ease-out 0.2s both;
+  mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+}
+
+.atlas-home__chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 20px 60px 20px;
+}
+
+.atlas-home__chat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.atlas-home__chat-intro {
+  text-align: center;
+  color: oklch(0.5 0.02 270);
+  font-size: 14px;
+  margin: 40px 0;
+}
+
+.atlas-home__chat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  animation: atlas-fade-in 0.3s ease-out;
+}
+
+.atlas-home__chat-msg--user {
+  flex-direction: row-reverse;
+}
+
+.atlas-home__chat-msg-avatar {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.atlas-home__chat-msg-orb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, oklch(0.7 0.2 290 / 0.8), oklch(0.3 0.1 270 / 0.9));
+  box-shadow: 0 0 10px oklch(0.7 0.2 290 / 0.3);
+}
+
+.atlas-home__chat-msg-orb--thinking {
+  animation: atlas-breathe 1.5s ease-in-out infinite;
+  background: radial-gradient(circle at 30% 30%, oklch(0.8 0.15 200 / 0.8), oklch(0.4 0.1 270 / 0.9));
+  box-shadow: 0 0 15px oklch(0.8 0.15 200 / 0.4);
+}
+
+.atlas-home__chat-msg-bubble {
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid oklch(1 0 0 / 0.06);
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: oklch(0.9 0.01 270);
+  max-width: 85%;
+}
+
+.atlas-home__chat-msg--user .atlas-home__chat-msg-bubble {
+  background: oklch(1 0 0 / 0.07);
+  border-color: oklch(1 0 0 / 0.12);
+  border-bottom-right-radius: 4px;
+}
+
+.atlas-home__chat-msg--assistant .atlas-home__chat-msg-bubble {
+  border-top-left-radius: 4px;
+}
+
+.atlas-home__chat-msg-bubble--loading {
+  color: oklch(0.5 0.02 270);
+  font-style: italic;
+}
+
+/* ── What Matters Area (Presence Only) ───────────────────────────── */
+.atlas-home__matters-area {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: 24px;
+  animation: atlas-fade-in 0.6s ease-out;
+}
+
+.atlas-home__panel {
+  background: oklch(1 0 0 / 0.02);
+  border: 1px solid oklch(1 0 0 / 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.atlas-home__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.atlas-home__panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: oklch(0.8 0.02 270);
+}
+
+.atlas-home__panel-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: oklch(1 0 0 / 0.1);
+  font-size: 10px;
+  color: white;
+}
+
+.atlas-home__panel-link {
+  color: oklch(0.4 0.02 270);
+  transition: color 0.2s;
+}
+
+.atlas-home__panel-link:hover {
+  color: white;
+}
+
+.atlas-home__panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atlas-home__matter-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: oklch(1 0 0 / 0.02);
+  border: 1px solid oklch(1 0 0 / 0.04);
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.atlas-home__matter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.atlas-home__matter-dot--high { background: oklch(0.65 0.2 25); box-shadow: 0 0 6px oklch(0.65 0.2 25 / 0.5); }
+.atlas-home__matter-dot--medium { background: oklch(0.75 0.15 75); }
+.atlas-home__matter-dot--low { background: oklch(0.5 0.02 270); }
+
+.atlas-home__matter-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.atlas-home__matter-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.atlas-home__matter-sub {
+  font-size: 11px;
+  color: oklch(0.5 0.02 270);
+}
+
+/* ── Bottom Area: Command Bar & Actions ──────────────────────────── */
+.atlas-home__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  z-index: 30;
+  padding-bottom: 24px;
+}
+
+.atlas-home__cmdbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 500px;
+  padding: 8px 12px;
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 30px;
+  backdrop-filter: blur(20px);
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.atlas-home__cmdbar--focused {
+  border-color: oklch(0.7 0.2 290 / 0.5);
+  box-shadow: 0 0 20px oklch(0.7 0.2 290 / 0.2);
+  background: oklch(1 0 0 / 0.05);
+}
+
+.atlas-home__cmdbar--listening {
+  border-color: oklch(0.8 0.15 200 / 0.4);
+  box-shadow: 0 0 20px oklch(0.8 0.15 200 / 0.2);
+}
+
+.atlas-home__cmdbar-mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: oklch(0.6 0.02 270);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.atlas-home__cmdbar-mic:hover {
+  color: oklch(0.8 0.15 200);
+}
+
+.atlas-home__live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(0.8 0.15 200);
+  animation: atlas-breathe 1.5s ease-in-out infinite;
+  box-shadow: 0 0 8px oklch(0.8 0.15 200 / 0.6);
+}
+
+.atlas-home__cmdbar-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: white;
+  padding: 0 12px;
+}
+
+.atlas-home__cmdbar-input::placeholder {
+  color: oklch(0.5 0.02 270);
+}
+
+.atlas-home__cmdbar-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.atlas-home__cmdbar-action--send {
+  background: oklch(0.7 0.2 290);
+  color: white;
+}
+
+.atlas-home__cmdbar-action--stop {
+  background: transparent;
+  border: 1px solid oklch(0.8 0.15 200 / 0.5);
+  color: oklch(0.8 0.15 200);
+}
+
+.atlas-home__cmdbar-action--stop:hover {
+  background: oklch(0.8 0.15 200 / 0.1);
+}
+
+.atlas-home__cmdbar-orb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid oklch(0.7 0.2 290 / 0.5);
+  background: transparent;
+  cursor: pointer;
+}
+
+.atlas-home__cmdbar-orb-inner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: oklch(0.7 0.2 290);
+  box-shadow: 0 0 8px oklch(0.7 0.2 290);
+}
+
+/* Quick Actions */
+.atlas-home__quick-actions {
+  display: flex;
+  gap: 12px;
+  animation: atlas-fade-in 0.6s ease-out;
+}
+
+.atlas-home__quick-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: oklch(1 0 0 / 0.03);
+  border: 1px solid oklch(1 0 0 / 0.06);
+  border-radius: 16px;
+  color: oklch(0.6 0.02 270);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.atlas-home__quick-btn:hover {
+  background: oklch(1 0 0 / 0.06);
+  color: white;
+}
+
+@keyframes atlas-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

@@ -19,8 +19,9 @@ export class HabitContextSource implements IContextSource {
 
     // Filter to those not completed today
     const incompleteHabits = habits.filter(h => {
-      if (!h.completedDates) return true;
-      const lastCompleted = h.completedDates[h.completedDates.length - 1];
+      const anyH = h as any;
+      if (!anyH.completedDates) return true;
+      const lastCompleted = anyH.completedDates[anyH.completedDates.length - 1];
       if (!lastCompleted) return true;
       const lastStr = new Date(lastCompleted).toISOString().split('T')[0];
       return lastStr !== todayStr;

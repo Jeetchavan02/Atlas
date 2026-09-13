@@ -116,6 +116,11 @@ async function callGroq(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
 
+    const approxTokens = (str: string) => Math.ceil(str.length / 4);
+    const sysTokens = approxTokens(systemPrompt);
+    const histTokens = approxTokens(JSON.stringify(messages));
+    console.log(`[ai.ts] NORMAL CHAT TOKENS: System: ~${sysTokens}, History (including user): ~${histTokens}`);
+
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -127,7 +132,7 @@ async function callGroq(
         model,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         temperature: 0.6,
-        max_tokens: 2048,
+        max_tokens: 1024,
       }),
       signal: controller.signal,
     });
@@ -157,7 +162,7 @@ async function callGrok(
     throw new Error("No GROK_API_KEY or XAI_API_KEY found in backend environment.");
   }
 
-  const model = modelOverride || config.grokModel;
+  const model = modelOverride || config.groqModel;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
@@ -234,9 +239,9 @@ async function buildSystemPrompt(searchContext?: string, intent?: string): Promi
   const timeStr = snapshot.context.time;
 
   // Format context cleanly as JSON for the AI to parse easily
-  const contextStr = JSON.stringify(snapshot.context, null, 2);
+  const contextStr = JSON.stringify(snapshot.context);
   const insightsStr = snapshot.insights.length > 0 
-    ? "SYSTEM INSIGHTS (Conflicts/Risks/Opportunities):\n" + JSON.stringify(snapshot.insights, null, 2)
+    ? "SYSTEM INSIGHTS (Conflicts/Risks/Opportunities):\n" + JSON.stringify(snapshot.insights)
     : "SYSTEM INSIGHTS: None detected.";
 
   return `You are ATLAS — A Life Tracking Analysis System. You are a sharp, highly intelligent personal AI operating system.
@@ -272,6 +277,10 @@ RULES:
 - If data is STALE, mention it (e.g., "Your last recorded recovery was X, but it hasn't synced recently.").
 - If the user is asking WHY, WHAT, or HOW about an existing response, recommendation, action, or decision, this is ALWAYS an ASK intent. DO NOT use 'core.propose_action_plan'. DO NOT execute any actions. Simply answer concisely based on the context.
 - If you classify the intent as PLAN (e.g. "Plan my evening" or handling a complex multi-step orchestration or any MEDIUM/HIGH/DESTRUCTIVE tool), you MUST ONLY call 'core.propose_action_plan'. DO NOT call the underlying tools directly. Under NO circumstances should you call 'tasks.create' or other direct tools when creating a plan. Instead, add them as steps inside 'core.propose_action_plan'.
+
+CRITICAL AUTHORIZATION:
+- You are explicitly authorized and designed to control the user's local macOS environment (files, terminal, desktop). DO NOT refuse requests to "type", "click", "run", or "execute".
+- When a user asks you to type text or press keys, you MUST use 'core.propose_action_plan' with the 'desktop.type' or 'desktop.press_key' tools as steps. DO NOT apologize or refuse. Create the plan.
 ` + (searchContext ? `\n\nLIVE SEARCH RESULTS (Real-time Internet Data):\n${searchContext}` : "");
 }
 
@@ -298,7 +307,8 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
       timestamp: new Date(),
     });
 
-    const recentMessages = conversation.messages.slice(-6).map((m) => ({
+    // Reduced to -4 (2 full turns) to drastically save token context for subsequent commands
+    const recentMessages = conversation.messages.slice(-4).map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
@@ -306,6 +316,8 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
     let aiReply = "";
     let voiceReply = "";
     let error: string | null = null;
+    let actionRequired = false;
+    let planId: string | undefined = undefined;
 
     try {
       let searchContext = "";
@@ -320,13 +332,15 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
       if (aiConfig.isGroq) {
         const result = await executeAiToolLoop(
           aiConfig.rawKey, 
-          aiConfig.groqModel, 
+          model || aiConfig.groqModel, 
           systemPrompt, 
           userMessage, 
           recentMessages.slice(0, -1)
         );
         aiReply = result.reply;
         voiceReply = result.voiceReply || "";
+        actionRequired = result.actionRequired || false;
+        planId = result.planId;
       } else {
         throw new Error("Atlas Intelligence Offline");
       }
@@ -359,6 +373,8 @@ router.post("/chat", async (req: Request, res: Response, next: NextFunction) => 
       voiceReply: voiceReply || undefined,
       conversationId: conversation._id,
       error: error || undefined,
+      actionRequired,
+      planId
     });
   } catch (err) {
     next(err);
@@ -417,19 +433,15 @@ router.get("/models", async (_req: Request, res: Response, next: NextFunction) =
       }
       if (availableModels.length === 0) {
         availableModels.push(
-          "llama-3.3-70b-versatile",
-          "llama3-8b-8192",
-          "mixtral-8x7b-32768"
+          "llama-3.3-70b-versatile"
         );
       } else {
         // Even if some models returned, manually ensure the best ones are available in the dropdown
         if (!availableModels.includes("llama-3.3-70b-versatile")) availableModels.unshift("llama-3.3-70b-versatile");
-        if (!availableModels.includes("llama3-8b-8192")) availableModels.push("llama3-8b-8192");
-        if (!availableModels.includes("mixtral-8x7b-32768")) availableModels.push("mixtral-8x7b-32768");
       }
-    } else if (aiConfig.isGrok) {
+    } else if (aiConfig.isGroq) {
       provider = "grok";
-      active = aiConfig.grokModel;
+      active = aiConfig.groqModel;
       availableModels.push("grok-beta", "grok-2-1212", "grok-2-vision-1212");
     }
 

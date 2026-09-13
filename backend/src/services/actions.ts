@@ -42,9 +42,32 @@ export class ActionRegistry {
     });
   }
 
-  async execute(name: string, params: any): Promise<any> {
+  async execute(name: string, params: any, options?: { isApproved?: boolean }): Promise<any> {
     const action = this.actions.get(name);
-    if (!action) throw new Error(`Action ${name} not found`);
+    
+    if (!action) {
+      console.log(`[ActionRegistry] action = ${name}`);
+      console.log(`[ActionRegistry] Error: Action not found`);
+      throw new Error(`Action ${name} not found`);
+    }
+
+    console.log(`[ActionRegistry] action = ${name}`);
+    console.log(`[ActionRegistry] risk = ${action.riskLevel}`);
+
+    if (action.riskLevel === "HIGH" || action.riskLevel === "DESTRUCTIVE") {
+      console.log(`[PermissionGateway] approved = ${options?.isApproved ? "true" : "false"}`);
+      if (!options?.isApproved) {
+        console.log(`[PermissionGateway] decision = REJECTED`);
+        throw new Error(
+          `Permission Denied. Action ${name} requires explicit user approval. Please use core.propose_action_plan to propose this action.`
+        );
+      } else {
+        console.log(`[PermissionGateway] decision = ALLOWED`);
+      }
+    } else {
+      console.log(`[PermissionGateway] approved = auto (LOW/MEDIUM)`);
+      console.log(`[PermissionGateway] decision = ALLOWED`);
+    }
 
     let parsed;
     try {
@@ -58,6 +81,10 @@ export class ActionRegistry {
     }
 
     const result = await action.handler(parsed);
+
+    console.log(`\n🛠️  TOOL EXECUTED: ${name}`);
+    console.log(`   ARGS: ${JSON.stringify(parsed)}`);
+    console.log(`   RESULT LENGTH: ${JSON.stringify(result).length} chars`);
 
     eventBus.emitEvent("AI_ACTION_EXECUTED", { action: name, params: parsed, result }, "ACTION_REGISTRY");
     return result;
@@ -205,3 +232,10 @@ registry.register({
     };
   }
 });
+
+// ── Local Agent Capabilities ───────────────────────────────────────────────
+import { localAgentCapabilities } from "./localAgent/capabilities.js";
+
+for (const cap of localAgentCapabilities) {
+  registry.register(cap);
+}

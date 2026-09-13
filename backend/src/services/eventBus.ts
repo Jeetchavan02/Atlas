@@ -10,7 +10,16 @@ export type AtlasEventType =
   | "MEMORY_FORGOTTEN"
   | "AUTOMATION_TRIGGERED"
   | "AI_ACTION_EXECUTED"
-  | "NOTIFICATION";
+  | "NOTIFICATION"
+  | "ACTION_PLAN_APPROVED"
+  | "ACTION_PLAN_EXECUTED"
+  | "ACTION_PLAN_REJECTED"
+  | "RECOMMENDATION_EXECUTED"
+  | "LOCAL_ACTION_REQUESTED"
+  | "LOCAL_ACTION_APPROVED"
+  | "LOCAL_ACTION_STARTED"
+  | "LOCAL_ACTION_COMPLETED"
+  | "LOCAL_ACTION_FAILED";
 
 export interface AtlasEvent<T = any> {
   id: string;
@@ -86,7 +95,7 @@ setTimeout(() => {
           }
         }
         
-        if (conditionMet) {
+        if (conditionMet && auto.action) {
           console.log(`[automation] Rule "${auto.name}" triggered by ${event.type}`);
           
           try {
@@ -98,7 +107,7 @@ setTimeout(() => {
             
             eventBus.emitEvent("AUTOMATION_TRIGGERED", { automationId: auto._id }, "AUTOMATION_ENGINE");
           } catch (execErr) {
-            console.error(`[automation] Action ${auto.action.name} failed:`, execErr);
+            console.error(`[automation] Action ${auto.action?.name} failed:`, execErr);
           }
         }
       }
