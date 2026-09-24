@@ -28,10 +28,17 @@ Why did we build this? Because tracking your life shouldn't require a dozen disc
 ## ✨ Premium Features
 
 ### 🧠 Intelligent AI Assistant
-Context-aware conversations with a sophisticated, J.A.R.V.I.S.-style persona using ultra-fast LLM inference. It dynamically reads your live database to inform its answers.
+Context-aware conversations with a sophisticated, J.A.R.V.I.S.-style persona using ultra-fast LLM inference. It dynamically reads your live database to inform its answers. Features a conversational voice UI with interruption support.
 
-### 🌐 Live Web Search
-Automatically fetches real-time data and facts when you ask questions, instantly parsing the live web to keep answers accurate and up-to-date.
+### 💻 Local Agent & macOS Desktop Control (Phase 6)
+Atlas goes beyond a dashboard by securely controlling your actual computer:
+- **Autonomous CLI:** Run the `atlas` command globally to interact from any terminal.
+- **ActionRegistry & Permission Gateway:** Robustly sandboxed architecture ensuring AI never performs HIGH-risk actions without explicit approval.
+- **macOS Automation:** Focus apps, type text, and press keys directly via AI-generated Action Plans.
+- **File System Access:** Search, read, and write files safely within the workspace.
+
+### 🌐 Live Web Search & Context Engine
+Automatically fetches real-time data and facts when you ask questions. The dynamic **Context Engine** intelligently routes your intent to inject only the relevant health, task, or calendar data without blowing up token limits.
 
 ### ❤️ Health & Fitness Tracking
 Total integration of your physical metrics:
@@ -42,6 +49,7 @@ Total integration of your physical metrics:
 Keeps your life organized and on track:
 - **Task Management:** Real-time prioritization of daily and weekly tasks.
 - **Habit Streaks:** Advanced streak tracking for mindfulness, fitness, and nutrition goals.
+- **Action Plans:** Approves multi-step AI orchestrations before execution.
 
 ---
 
